@@ -50,6 +50,9 @@ from osdagbridge.core.utils.common import (
     KEY_WL_SUPER_AREA_ELEV_VALUE, KEY_WL_SUPER_AREA_PLAIN_VALUE,
     KEY_WL_EXPOSED_FRONTAL_VALUE,
     KEY_WL_WIND_ECC_DECK_VALUE, KEY_WL_WIND_LL_ECC_VALUE,
+    KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP,
+    KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX,
+    KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL,
     KEY_TL_THERMAL_COEFF_STEEL, KEY_TL_THERMAL_COEFF_RCC,
     KEY_DS_TOP_CLEAR_COVER, KEY_DS_BOTTOM_CLEAR_COVER, KEY_DS_SIDE_CLEAR_COVER,
     KEY_DS_STUD_YIELD_STRENGTH, KEY_DS_STUD_ULTIMATE_STRENGTH,
@@ -102,6 +105,9 @@ _ADDITIONAL_KEYS = [
     KEY_WL_SUPER_AREA_ELEV_VALUE, KEY_WL_SUPER_AREA_PLAIN_VALUE,
     KEY_WL_EXPOSED_FRONTAL_VALUE, KEY_WL_WIND_ECC_DECK_VALUE,
     KEY_WL_WIND_LL_ECC_VALUE,
+    KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP,
+    KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX,
+    KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL,
     KEY_TL_THERMAL_COEFF_STEEL, KEY_TL_THERMAL_COEFF_RCC,
     KEY_DS_TOP_CLEAR_COVER, KEY_DS_BOTTOM_CLEAR_COVER, KEY_DS_SIDE_CLEAR_COVER,
     KEY_DS_STUD_YIELD_STRENGTH, KEY_DS_STUD_ULTIMATE_STRENGTH,
@@ -142,6 +148,18 @@ class OsiInputValidator:
             flat[KEY_SKEW_ANGLE] = 0.0
 
         self._validate_design_mode(flat, result)
+
+        raw_tl_legacy = flat.get("temperature_load_kN_m2")
+        if not self._is_missing(raw_tl_legacy):
+            try:
+                val_legacy = float(raw_tl_legacy)
+            except (TypeError, ValueError, OverflowError):
+                val_legacy = float("nan")
+            if not math.isfinite(val_legacy) or val_legacy != 0.0:
+                result.errors.append(
+                    "temperature_load_kN_m2: legacy vertical deck patch pressure is unsupported for "
+                    "thermal design; remove it and specify canonical KEY_TL_* thermal parameters."
+                )
 
         for key in _BASIC_KEYS:
             if self._is_missing(flat.get(key)) and key != KEY_SKEW_ANGLE:

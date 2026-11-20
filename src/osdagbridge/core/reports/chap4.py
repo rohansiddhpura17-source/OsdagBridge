@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from osdagbridge.core.utils.common import (
     KEY_SPAN,
@@ -75,6 +76,67 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
     _allow_total_str = f"L/600 = {_allow_total_mm:.1f} mm"
     _live_status     = ("PASS" if _live_mm  <= _allow_live_mm  else r"\textcolor{red}{FAIL}") if _live_mm  is not None else "---"
     _total_status    = ("PASS" if _total_mm <= _allow_total_mm else r"\textcolor{red}{FAIL}") if _total_mm is not None else "---"
+    rxn_rows = [
+        _tex(lc)
+        + r" & "
+        + _fmt(rxn_summary[lc].get("left_kN"))
+        + r" & "
+        + _fmt(rxn_summary[lc].get("right_kN"))
+        + r" \\[6pt]"
+        for lc in all_lcs
+        if lc in rxn_summary
+    ]
+    rxn_body = ("\n\\hline\n").join(rxn_rows) if rxn_rows else r"--- & --- & --- \\[6pt]"
+
+    out_dict = getattr(bridge, "output_dict", {}) or {}
+    thermal_info = out_dict.get("thermal_analysis") if isinstance(out_dict, Mapping) else None
+    thermal_section_tex = ""
+    if isinstance(thermal_info, Mapping) and thermal_info.get("spec"):
+        tspec = thermal_info["spec"]
+        tsum = thermal_info.get("solver_summary", {}) or {}
+        t_rows = []
+        for lc_name in thermal_info.get("load_cases", []):
+            sr = tsum.get(lc_name, {})
+            t_rows.append(
+                _tex(lc_name)
+                + r" & " + _fmt(sr.get("dx_max_mm"), 4)
+                + r" & " + _fmt(sr.get("dy_mid_max_mm"), 4)
+                + r" & " + _fmt(sr.get("N_max_kN"), 3)
+                + r" & " + _fmt(sr.get("Mz_max_kNm"), 3)
+                + r" & " + _fmt(sr.get("rx_equilibrium_residual_kN"), 6)
+                + r" \\[6pt]"
+            )
+        t_body = ("\n\\hline\n").join(t_rows) if t_rows else r"--- & --- & --- & --- & --- & --- \\[6pt]"
+        left_sup = str(tspec.get("left_support", "Pinned"))
+        right_sup = str(tspec.get("right_support", "Roller"))
+        kl_s = f"{float(tspec['k_left_kN_m']):.1f} kN/m" if tspec.get("k_left_kN_m") is not None else left_sup
+        kr_s = f"{float(tspec['k_right_kN_m']):.1f} kN/m" if tspec.get("k_right_kN_m") is not None else right_sup
+        thermal_section_tex = (
+            "\n\\vspace{1em}\n"
+            "\\noindent\\textbf{Thermal Analysis Summary (IRC:6-2017 Cl. 215)}\\\\\n"
+            f"Supports (Left / Right): {_tex(kl_s)} / {_tex(kr_s)}; "
+            f"$T_0 = {float(tspec.get('T0_used_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
+            f"$\\Delta T_{{rise}} = +{float(tspec.get('delta_T_rise_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
+            f"$\\Delta T_{{fall}} = -{float(tspec.get('delta_T_fall_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
+            f"$\\alpha_{{steel}} = {float(tspec.get('alpha_steel_per_C', 12e-6)):.3e}/^\\circ\\mathrm{{C}}$; "
+            f"$\\alpha_{{RCC}} = {float(tspec.get('alpha_rcc_per_C', 12e-6)):.3e}/^\\circ\\mathrm{{C}}$.\n"
+            "\\begin{longtable}{|"
+            ">{\\centering\\arraybackslash}p{3.4cm}|"
+            ">{\\centering\\arraybackslash}p{2.0cm}|"
+            ">{\\centering\\arraybackslash}p{2.0cm}|"
+            ">{\\centering\\arraybackslash}p{2.2cm}|"
+            ">{\\centering\\arraybackslash}p{2.3cm}|"
+            ">{\\centering\\arraybackslash}p{2.4cm}|}\n"
+            "\\caption{\\textbf{Thermal Load Case Responses}}\\\\\n"
+            "\\hline\n"
+            "\\textbf{Thermal Case} & \\textbf{$\\Delta x_{max}$ (mm)} & \\textbf{$\\Delta y_{max}$ (mm)} "
+            "& \\textbf{Max $N$ (kN)} & \\textbf{Max $M_z$ (kNm)} & \\textbf{$|\\Sigma R_x|$ (kN)} \\\\[6pt]\n"
+            "\\hline\n"
+            + t_body + "\n"
+            "\\hline\n"
+            "\\end{longtable}\n"
+        )
+
     return r"""
 \chapter{Analysis Results}
 
@@ -147,11 +209,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \hline
 \textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
 \hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
-\hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
-\hline
- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+""" + rxn_body + r"""
 \hline
 \end{longtable}
 
@@ -175,6 +233,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
 \textnormal{Total Load Deflection Check Status} & """ + _total_status + r""" \\[6pt]
 \hline
 \end{longtable}
+""" + thermal_section_tex + r"""
 
 \vspace{1em}
 \noindent

@@ -35,6 +35,13 @@ from .plot_generator import (
     figure_to_bytes,
 )
 from osdagbridge.core.utils.codes.irc6_2017 import IRC6_2017
+from osdagbridge.core.utils.codes.irc22_2015 import IRC22_2014
+from .thermal_analysis import (
+    parse_support_conditions,
+    parse_and_validate_thermal_inputs,
+    build_composite_section_layers,
+    compute_composite_thermal_section,
+)
 from osdagbridge.core.utils.common import (
     KEY_STRUCTURE_TYPE,
     KEY_PROJECT_LOCATION,
@@ -229,6 +236,10 @@ from osdagbridge.core.utils.common import (
     KEY_MP_STIFFENER_INTERMEDIATE_OUTSTAND,
     KEY_MP_STIFFENER_INTERMEDIATE_SPACING,
     KEY_MP_STIFFENER_LONGITUDINAL,
+    KEY_TL_BRIDGE_TEMP_MIN,
+    KEY_TL_BRIDGE_TEMP_MAX,
+    KEY_TL_TEMP_RISE,
+    KEY_TL_TEMP_FALL,
 
     # Cross Bracing Details
     KEY_MP_CB_BRACING_SECTION_TYPE,
@@ -636,6 +647,9 @@ class PlateGirderBridge:
         if spacing <= 0:
             raise ValueError(f"Girder spacing must be positive, got {spacing}.")
 
+        parse_support_conditions(inp)
+        parse_and_validate_thermal_inputs(inp)
+
     def _solve_bridge_layout(self):
         """Snapshot input_dict into mutable output_dict for the pipeline."""
         self.output_dict = dict(self.input_dict)
@@ -730,6 +744,7 @@ class PlateGirderBridge:
             dataset = self._run_stage("4G", self._reanalyze_with_dedup)
             dataset = self.create_envelope_load_case(dataset)
             dataset = self._drop_moving_increment_cases(dataset)
+            self._populate_thermal_solver_summary(dataset)
 
             # Drop the raw ospgrillage per-load-case records as soon as the
             # deduplicated dataset is cached: everything downstream (design checks,
@@ -1123,21 +1138,115 @@ class PlateGirderBridge:
         deck_layout, and section_props.
         """
         self.grillage_model.set_geometry(self.grillage_geometry, self.deck_layout)
-        # Build one SectionProperties per main girder. When the input dict carries
-        # per-girder dynamic keys (``<base>.G{i}.M1``) the girders may differ;
-        # otherwise every girder falls back to the shared scalar section.
+        # Clear any stale thermal state from prior runs on this instance.
+        self.grillage_model.temperature_load_case = None
+        self.grillage_model.thermal_load_cases = {}
+        self.grillage_model.thermal_section_summaries = {}
+        self.thermal_results = None
+        self._thermal_girder_layers = None
+
+        supports = parse_support_conditions(self.input_dict)
+        self._thermal_spec = parse_and_validate_thermal_inputs(self.input_dict)
+        self.material_props = self._build_material_props()
+
+        # Build one SectionProperties per main girder. When canonical thermal
+        # inputs are active, transform girder (A, Iz) to the steel-referenced
+        # composite section so OpenSees longitudinal thermal & mechanical
+        # stiffness matches IRC:6-2017 Cl. 215. When thermal inputs are absent,
+        # keep exact pre-thermal bare-steel girder sections for invariance.
         n_girders = self._girder_count()
-        girder_sections = [self._girder_section(i) for i in range(n_girders)]
+        base_girder_sections = [self._girder_section(i) for i in range(n_girders)]
+        girder_sections = list(base_girder_sections)
+        if self._thermal_spec is not None:
+            layers_list, E_s_Pa, t_slab_m = self._build_thermal_girder_layers(self._thermal_spec)
+            comp_sections = []
+            for gi, sec in enumerate(base_girder_sections):
+                comp = compute_composite_thermal_section(
+                    layers=layers_list[gi],
+                    E_ref_Pa=E_s_Pa,
+                    dT_fn=lambda y, D: 0.0,
+                )
+                comp_sections.append(
+                    SectionProperties(
+                        A=comp["A_eq_steel_m2"],
+                        J=sec.J,
+                        Iz=comp["Iz_eq_steel_m4"],
+                        Iy=sec.Iy,
+                        Az=sec.Az,
+                        Ay=sec.Ay,
+                    )
+                )
+            girder_sections = comp_sections
+            self._thermal_girder_layers = layers_list
+            self._thermal_E_s_Pa = E_s_Pa
+            self._thermal_t_slab_m = t_slab_m
+            self.grillage_model.uses_composite_girder_sections = True
+        else:
+            self.grillage_model.uses_composite_girder_sections = False
+
         self.grillage_model.create_sections(
             girder_sections=girder_sections,
             edge_longitudinal=self._girder_section(),
             transverse=self._transverse_section(),
             end_transverse=self._end_transverse_section(),
+            steel_girder_sections=base_girder_sections,
         )
-        self.material_props = self._build_material_props()
         self.grillage_model.create_material(self.material_props)
         self.grillage_model.assign_members()
-        self.grillage_model.create_model()
+        self.grillage_model.create_model(
+            left_support=supports["left_support"],
+            right_support=supports["right_support"],
+            k_left_kN_m=supports["k_left_kN_m"],
+            k_right_kN_m=supports["k_right_kN_m"],
+        )
+
+    def _build_thermal_girder_layers(
+        self, thermal_spec: dict
+    ) -> tuple[list[list[dict]], float, float]:
+        """Build bottom-to-top composite section layers per main girder."""
+        if getattr(self, "material_props", None) is None:
+            self.material_props = self._build_material_props()
+        E_s_Pa = float(self.material_props.steel_prop.E)
+        E_c_Pa = float(self.material_props.concrete_prop.Ecm) * GPa
+        t_slab_m = float(
+            deck_thickness_from_inputs(self.input_dict, _DEFAULT_DECK_THICKNESS_MM)
+        )
+        L_m = float(self.input_dict[KEY_SPAN])
+        B_m = float(self.input_dict[KEY_TS_GIRDER_SPACING])
+        edge_m = float(self.input_dict.get(KEY_TS_DECK_OVERHANG, 0.0) or 0.0)
+        n_girders = self._girder_count()
+
+        layers_list: list[list[dict]] = []
+        for gi in range(n_girders):
+            if gi in (0, n_girders - 1):
+                eff = IRC22_2014.cl_603_2_1_effective_width_simply_supported(
+                    Lo=L_m, beam_type="outer", B1=B_m, B0=edge_m
+                )
+            else:
+                eff = IRC22_2014.cl_603_2_1_effective_width_simply_supported(
+                    Lo=L_m, beam_type="inner", B=B_m
+                )
+            b_eff_m = float(eff["beff_m"])
+            steel_dims = {
+                "tf_bot_m": float(self._girder_value(KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS, gi)),
+                "bf_bot_m": float(self._girder_value(KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH, gi)),
+                "dw_m":     float(self._girder_value(KEY_MP_GIRDER_WEB_DEPTH, gi)),
+                "tw_m":     float(self._girder_value(KEY_MP_GIRDER_WEB_THICKNESS, gi)),
+                "tf_top_m": float(self._girder_value(KEY_MP_GIRDER_TOP_FLANGE_THICKNESS, gi)),
+                "bf_top_m": float(self._girder_value(KEY_MP_GIRDER_TOP_FLANGE_WIDTH, gi)),
+            }
+            layers_list.append(
+                build_composite_section_layers(
+                    steel_dims=steel_dims,
+                    b_eff_m=b_eff_m,
+                    t_slab_m=t_slab_m,
+                    E_s_Pa=E_s_Pa,
+                    E_c_Pa=E_c_Pa,
+                    alpha_steel=float(thermal_spec["alpha_steel_per_C"]),
+                    alpha_rcc=float(thermal_spec["alpha_rcc_per_C"]),
+                )
+            )
+        return layers_list, E_s_Pa, t_slab_m
 
     def _lookup_material(self, material_name: str, property: str) -> float:
         """
@@ -1893,24 +2002,128 @@ class PlateGirderBridge:
 
     def add_temperature_load(self) -> None:
         """
-        Apply temperature load to the grillage model as a patch load over the
-        full deck footprint per IRC:6-2017 Cl.215.
+        Apply IRC:6-2017 Cl. 215 uniform & gradient thermal eigenstrain actions
+        via ``BridgeGrillageModel.create_thermal_load_cases()``.
 
-        The load intensity is read from ``self.additional_inputs`` using the key
-        ``"temperature_load_kN_m2"``.  If the key is absent or zero the load is
-        silently skipped (temperature load is optional).
-
-        Delegates to BridgeGrillageModel.create_temperature_load().
+        Canonical ``KEY_TL_*`` inputs activate first-class thermal cases
+        (``TL_UNIFORM_RISE``, ``TL_UNIFORM_FALL``, ``TL_GRADIENT_HEAT``,
+        ``TL_GRADIENT_COOL``, and governing ``1.0 TL``). Legacy
+        ``temperature_load_kN_m2`` is explicitly rejected by
+        ``parse_and_validate_thermal_inputs()``. When no canonical thermal
+        inputs are configured, skips cleanly to preserve nonthermal invariance.
         """
-        tl_raw = self.input_dict.get("temperature_load_kN_m2")
-        if not tl_raw or float(tl_raw) == 0.0:
+        spec = getattr(self, "_thermal_spec", None)
+        if spec is None:
+            spec = parse_and_validate_thermal_inputs(self.input_dict)
+        if spec is None:
             bridge_logger.info("Temperature load absent; skipping.")
             return
-        tl_kN_m2 = float(tl_raw)
-        self.grillage_model.create_temperature_load(
-            temperature_load_kN_m2=tl_kN_m2,
-            partial_safety_factor=1.0,
+        self._thermal_spec = spec
+
+        if getattr(self, "_thermal_girder_layers", None) is None:
+            layers_list, E_s_Pa, t_slab_m = self._build_thermal_girder_layers(spec)
+            self._thermal_girder_layers = layers_list
+            self._thermal_E_s_Pa = E_s_Pa
+            self._thermal_t_slab_m = t_slab_m
+
+        summary = self.grillage_model.create_thermal_load_cases(
+            thermal_spec=spec,
+            girder_layers_list=self._thermal_girder_layers,
+            E_s_Pa=self._thermal_E_s_Pa,
+            t_slab_m=self._thermal_t_slab_m,
         )
+        self.thermal_results = {"spec": spec, **summary}
+
+        if isinstance(getattr(self, "output_dict", None), dict):
+            self.output_dict[KEY_TL_BRIDGE_TEMP_MIN] = f"{float(spec['T_e_min_C']):.2f}"
+            self.output_dict[KEY_TL_BRIDGE_TEMP_MAX] = f"{float(spec['T_e_max_C']):.2f}"
+            self.output_dict[KEY_TL_TEMP_RISE] = f"{float(spec['delta_T_rise_C']):.2f}"
+            self.output_dict[KEY_TL_TEMP_FALL] = f"{float(spec['delta_T_fall_C']):.2f}"
+            self.output_dict["thermal_analysis"] = self.thermal_results
+
+    def _populate_thermal_solver_summary(self, dataset) -> None:
+        """Populate solved displacements, girder forces & reactions per thermal case."""
+        if (
+            dataset is None
+            or getattr(self, "_thermal_spec", None) is None
+            or not isinstance(getattr(self, "output_dict", None), dict)
+            or "thermal_analysis" not in self.output_dict
+        ):
+            return
+        import numpy as np
+
+        rh = PlateGirderAnalysisResults(
+            dataset=dataset,
+            bridge=self.grillage_model,
+            edge_dist=self.get_edge_dist(),
+        )
+        g_map, _ = rh.build_girders(verbose=False)
+        girder_nodes = sorted({
+            int(n)
+            for gk, gv in g_map.items()
+            if not gk.startswith("EB")
+            for n in gv.get("path", [])
+        })
+        girder_eles = sorted({
+            int(e)
+            for gk, gv in g_map.items()
+            if not gk.startswith("EB")
+            for e in gv.get("elements", [])
+        })
+        if not girder_nodes or not girder_eles:
+            return
+
+        avail_lcs = {str(lc) for lc in dataset.coords["Loadcase"].values}
+        disp_nodes = [n for n in girder_nodes if n in set(int(x) for x in dataset["displacements"].coords["Node"].values)]
+        force_eles = [e for e in girder_eles if e in set(int(x) for x in dataset["forces"].coords["Element"].values)]
+        has_rxn = "reactions" in dataset.data_vars
+
+        def _signed_extreme(arr: np.ndarray) -> float:
+            flat = np.nan_to_num(np.asarray(arr, dtype=float).ravel(), nan=0.0)
+            if flat.size == 0:
+                return 0.0
+            idx = int(np.argmax(np.abs(flat)))
+            return float(flat[idx])
+
+        solver_summary: dict[str, dict] = {}
+        for lc_name in self.output_dict["thermal_analysis"].get("load_cases", []):
+            if lc_name not in avail_lcs:
+                continue
+            disp_lc = dataset["displacements"].sel(Loadcase=lc_name, Node=disp_nodes)
+            dx_m = _signed_extreme(disp_lc.sel(Component="x").values)
+            dy_m = _signed_extreme(disp_lc.sel(Component="y").values)
+
+            f_lc = dataset["forces"].sel(Loadcase=lc_name, Element=force_eles)
+            n_n = _signed_extreme(f_lc.sel(Component=["Vx_i", "Vx_j"]).values)
+            mz_nm = _signed_extreme(f_lc.sel(Component=["Mz_i", "Mz_j"]).values)
+
+            entry = {
+                "dx_max_mm": round(dx_m * 1000.0, 6),
+                "dy_mid_max_mm": round(dy_m * 1000.0, 6),
+                "N_max_kN": round(n_n / 1000.0, 6),
+                "Mz_max_kNm": round(mz_nm / 1000.0, 6),
+                "Rx_sum_kN": 0.0,
+                "Ry_sum_kN": 0.0,
+                "Rx_abs_max_node_kN": 0.0,
+                "rx_equilibrium_residual_kN": 0.0,
+                "ry_equilibrium_residual_kN": 0.0,
+            }
+            if has_rxn:
+                rxn_lc = dataset["reactions"].sel(Loadcase=lc_name)
+                fx_kn = np.nan_to_num(np.asarray(rxn_lc.sel(ReactionComponent="Fx").values, dtype=float), nan=0.0) / 1000.0
+                fy_kn = np.nan_to_num(np.asarray(rxn_lc.sel(ReactionComponent="Fy").values, dtype=float), nan=0.0) / 1000.0
+                rx_sum = float(np.sum(fx_kn))
+                ry_sum = float(np.sum(fy_kn))
+                entry["Rx_sum_kN"] = round(rx_sum, 6)
+                entry["Ry_sum_kN"] = round(ry_sum, 6)
+                entry["Rx_abs_max_node_kN"] = round(float(np.max(np.abs(fx_kn))) if fx_kn.size else 0.0, 6)
+                entry["rx_equilibrium_residual_kN"] = round(abs(rx_sum), 8)
+                entry["ry_equilibrium_residual_kN"] = round(abs(ry_sum), 8)
+            solver_summary[lc_name] = entry
+
+        self.output_dict["thermal_analysis"]["solver_summary"] = solver_summary
+        if isinstance(getattr(self, "thermal_results", None), dict):
+            self.thermal_results["solver_summary"] = solver_summary
 
     def add_seismic_loads(self) -> None:
         """

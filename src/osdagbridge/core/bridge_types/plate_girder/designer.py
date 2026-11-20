@@ -2889,7 +2889,11 @@ def _extract_demands_from_analysis_results(
         A_steel_mm2=sec.A_steel, Iz_steel_mm4=sec.Iz_steel,
         y_cg_from_bot_mm=sec.y_cg_from_bot, D_steel_mm=sec.D, n=mod["m_short_term"],
     )
-    stiffness_ratio = max(props[KEY_COMP_I] / sec.Iz_steel, 1.0)
+    if getattr(getattr(analysis_results, "bridge", None), "uses_composite_girder_sections", False):
+        # Grillage longitudinal members already use composite transformed (A_eq, Iz_eq).
+        stiffness_ratio = 1.0
+    else:
+        stiffness_ratio = max(props[KEY_COMP_I] / sec.Iz_steel, 1.0)
 
 
     Ze_steel_mm3 = float(config.section.Ze_steel)

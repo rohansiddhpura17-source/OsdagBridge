@@ -38,6 +38,7 @@ __all__ = [
     "LineLoading",
     "LoadVertex",
     "LoadPoint",  # deprecated alias for LoadVertex
+    "ThermalElementLoad",
     "CompoundLoad",
     "Line",
     "ShapeFunction",
@@ -1157,6 +1158,58 @@ class CompoundLoad:
         for load_obj in self.compound_load_obj_list:
             if hasattr(load_obj, "apply_load_factor"):
                 load_obj.apply_load_factor(factor)
+
+
+class ThermalElementLoad(Loads):
+    """Equivalent nodal thermal action container with per-element local fixed-end vectors.
+
+    Stores precomputed equivalent global nodal force/moment vectors applied to the
+    elastic OpenSeesPy model via ``ops.load()``, together with the element-level
+    fixed-end thermal nodal action vectors (``fth_local`` and ``fth_global``)
+    required during result recovery so reported element forces equal ``K q - f_th``.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        element_fth_local: dict[int, list[float]] | None = None,
+        element_fth_global: dict[int, list[float]] | None = None,
+        nodal_loads_global: dict[int, list[float]] | None = None,
+        metadata: dict | None = None,
+    ):
+        super().__init__(name=name)
+        self.element_fth_local: dict[int, list[float]] = {
+            int(k): [float(x) for x in v] for k, v in (element_fth_local or {}).items()
+        }
+        self.element_fth_global: dict[int, list[float]] = {
+            int(k): [float(x) for x in v] for k, v in (element_fth_global or {}).items()
+        }
+        self.nodal_loads_global: dict[int, list[float]] = {
+            int(k): [float(x) for x in v] for k, v in (nodal_loads_global or {}).items()
+        }
+        self.metadata: dict = dict(metadata or {})
+
+    def apply_load_factor(self, factor=1):
+        """Scale nodal equivalent loads and element fixed-end thermal vectors by *factor*."""
+        f = float(factor)
+        for vec in self.element_fth_local.values():
+            for idx in range(len(vec)):
+                vec[idx] *= f
+        for vec in self.element_fth_global.values():
+            for idx in range(len(vec)):
+                vec[idx] *= f
+        for vec in self.nodal_loads_global.values():
+            for idx in range(len(vec)):
+                vec[idx] *= f
+
+    def get_nodal_load_calls(self) -> list[tuple]:
+        """Return ``('load', (node_tag, Fx, Fy, Fz, Mx, My, Mz), {})`` calls for ``_OpsProxy._dispatch()``."""
+        calls = []
+        for node_tag in sorted(self.nodal_loads_global.keys()):
+            vec = self.nodal_loads_global[node_tag]
+            if any(abs(v) > 0.0 for v in vec):
+                calls.append(("load", (int(node_tag), *[float(v) for v in vec]), {}))
+        return calls
 
 
 # ---------------------------------------------------------------------------------------------------------------

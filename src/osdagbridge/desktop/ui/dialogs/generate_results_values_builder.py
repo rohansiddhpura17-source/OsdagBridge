@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 import logging
 from osdagbridge.core.utils.common import *
 
@@ -1091,10 +1092,11 @@ def resolve_temperature_load_parameters(input_dict: dict, bridge=None) -> dict |
     thermal_coeff_rcc   = input_dict.get(KEY_TL_THERMAL_COEFF_RCC)   or "12.0e-6"
 
     # ── Computed values — recompute from air temps when absent ─────────────
-    bridge_temp_min = input_dict.get(KEY_TL_BRIDGE_TEMP_MIN)
-    bridge_temp_max = input_dict.get(KEY_TL_BRIDGE_TEMP_MAX)
-    temp_rise       = input_dict.get(KEY_TL_TEMP_RISE)
-    temp_fall       = input_dict.get(KEY_TL_TEMP_FALL)
+    out_d = (getattr(bridge, "output_dict", None) or {}) if bridge is not None else {}
+    bridge_temp_min = input_dict.get(KEY_TL_BRIDGE_TEMP_MIN) or out_d.get(KEY_TL_BRIDGE_TEMP_MIN)
+    bridge_temp_max = input_dict.get(KEY_TL_BRIDGE_TEMP_MAX) or out_d.get(KEY_TL_BRIDGE_TEMP_MAX)
+    temp_rise       = input_dict.get(KEY_TL_TEMP_RISE)       or out_d.get(KEY_TL_TEMP_RISE)
+    temp_fall       = input_dict.get(KEY_TL_TEMP_FALL)       or out_d.get(KEY_TL_TEMP_FALL)
 
     if (not _has(bridge_temp_min) or not _has(bridge_temp_max)
             or not _has(temp_rise) or not _has(temp_fall)):
@@ -2304,6 +2306,45 @@ def resolve_shear_force_by_load_case(input_dict: dict, bridge=None) -> dict | No
         return None
 
 
+def resolve_thermal_analysis_summary(input_dict: dict, bridge=None) -> dict | None:
+    """Return solved OpenSeesPy thermal case displacements, forces & equilibrium table."""
+    if bridge is None:
+        return None
+    out_d = getattr(bridge, "output_dict", None) or {}
+    tinfo = out_d.get("thermal_analysis") if isinstance(out_d, Mapping) else None
+    if not isinstance(tinfo, Mapping):
+        return None
+    ssum = tinfo.get("solver_summary") or {}
+    rows = []
+    for lc_name in tinfo.get("load_cases", []):
+        sr = ssum.get(lc_name, {})
+        rows.append([
+            str(lc_name),
+            _num(sr.get("dx_max_mm"), decimals=4) if sr.get("dx_max_mm") is not None else EMPTY,
+            _num(sr.get("dy_mid_max_mm"), decimals=4) if sr.get("dy_mid_max_mm") is not None else EMPTY,
+            _num(sr.get("N_max_kN"), decimals=3) if sr.get("N_max_kN") is not None else EMPTY,
+            _num(sr.get("Mz_max_kNm"), decimals=3) if sr.get("Mz_max_kNm") is not None else EMPTY,
+            _num(sr.get("Rx_sum_kN"), decimals=6) if sr.get("Rx_sum_kN") is not None else EMPTY,
+            _num(sr.get("Ry_sum_kN"), decimals=6) if sr.get("Ry_sum_kN") is not None else EMPTY,
+            _num(sr.get("rx_equilibrium_residual_kN"), decimals=6) if sr.get("rx_equilibrium_residual_kN") is not None else EMPTY,
+        ])
+    return {
+        "id": "thermal_analysis_summary",
+        "label": "Thermal Analysis Summary (IRC:6-2017 Cl. 215)",
+        "columns": [
+            "Load Case",
+            "Max Axial Displacement dx (mm)",
+            "Max Vertical Deflection dy (mm)",
+            "Max Axial Force N (kN)",
+            "Max Bending Moment Mz (kNm)",
+            "Sum Rx (kN)",
+            "Sum Ry (kN)",
+            "Eq. Residual |Sum Rx| (kN)",
+        ],
+        "rows": rows,
+    }
+
+
 # ── Registry — must be after all resolver definitions ────────────────────────
 
 RESOLVER_MAP: dict[str, callable] = {
@@ -2323,6 +2364,7 @@ RESOLVER_MAP: dict[str, callable] = {
     "seismic_load_parameters": resolve_seismic_load_parameters,
     "wind_load_parameters": resolve_wind_load_parameters,
     "temperature_load_parameters": resolve_temperature_load_parameters,
+    "thermal_analysis_summary": resolve_thermal_analysis_summary,
     "load_combinations": resolve_load_combinations,
 
     # ── Analysis Results — Load Effects (Girder) ─────────────────────────────

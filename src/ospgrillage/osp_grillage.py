@@ -28,6 +28,7 @@ from ospgrillage.load import (
     PatchLoading,
     PointLoad,
     ShapeFunction,
+    ThermalElementLoad,
 )
 from ospgrillage.mesh import (
     BeamLinkMesh,
@@ -474,6 +475,8 @@ class OspGrillage:
         self.spring_node_pairs = (
             {}
         )  # dict with keys being master node (support) and value being slave node (non-support)
+        self.longitudinal_spring_edges = []
+        self.longitudinal_spring_node_pairs = {}  # {ground_node: (bridge_node, eq_dofs)}
         self.equal_dof_command_str_list = []  # list to store ops command
 
         # edge support type
@@ -579,6 +582,9 @@ class OspGrillage:
 
         # write equalDOF commands
         self._write_equal_dof(node_tag_list=self.spring_node_pairs.items())
+        for ground_node, (bridge_node, eq_dofs) in self.longitudinal_spring_node_pairs.items():
+            if eq_dofs:
+                self._ops.equalDOF(ground_node, bridge_node, *eq_dofs)
 
         # if created OpenSees instance, set instance flag
         if not self.pyfile:
@@ -657,19 +663,29 @@ class OspGrillage:
                 round(float(coordinate[2]), 4),
             )
 
+    def _overhang_edge_beam_zgroups(self) -> set[int]:
+        """Return outermost z_groups only when genuine overhang edge beams exist."""
+        has_edge_beams = (
+            float(getattr(self, "edge_width_a", 0.0) or 0.0) > 0.0
+            or float(getattr(self, "edge_width_b", 0.0) or 0.0) > 0.0
+        )
+        if not has_edge_beams:
+            return set()
+        return set(self.Mesh_obj.common_z_group_element.get(0, []))
+
     def _write_op_fix(self, mesh_obj):
         """Write/create fix commands."""
         if self.pyfile:
             with open(self.filename, "a") as fh:
                 fh.write("# Boundary condition implementation\n")
+        skip_zgroups = self._overhang_edge_beam_zgroups()
         for node_tag, edge_group_num in mesh_obj.edge_node_recorder.items():
-            if (
-                mesh_obj.node_spec[node_tag]["z_group"]
-                in mesh_obj.common_z_group_element[0]
-            ):
+            if mesh_obj.node_spec[node_tag]["z_group"] in skip_zgroups:
                 pass
             else:
                 self._ops.fix(node_tag, *self.edge_support_type_dict[edge_group_num])
+        for ground_node in self.longitudinal_spring_node_pairs.keys():
+            self._ops.fix(ground_node, 1, 1, 1, 1, 1, 1)
 
     # TODO
     def _write_mass(self):
@@ -1140,6 +1156,73 @@ class OspGrillage:
 
         # replace constrain onto constrains of node in node_list to new node
         self.Mesh_obj.edge_node_recorder.update(edge_node_dict)
+
+        self.element_command_list.update(ele_tag_to_command_dict)
+
+    def set_longitudinal_spring_support(
+        self,
+        stiffness_N_per_m: float,
+        edge_num: int = 0,
+        base_restraint: list[int] | None = None,
+    ):
+        """Apply a finite longitudinal translational bearing spring (DOF 1) along *edge_num*.
+
+        Creates a fixed ground node coincident with each supported main-girder
+        node on ``edge_num``, connects them via a uniaxial ``zeroLength`` spring in
+        global DOF 1 with tangent stiffness ``stiffness_N_per_m`` (N/m), and ties
+        the remaining fixed DOFs (e.g. ``[2, 3]`` for Pinned/Roller, ``[2, 3, 4, 5, 6]``
+        for Fixed) via ``equalDOF``. Must be called before ``create_osp_model()``.
+        """
+        stiffness = float(stiffness_N_per_m)
+        if not math.isfinite(stiffness) or stiffness <= 0.0:
+            raise ValueError(
+                f"Longitudinal bearing stiffness must be finite and > 0 N/m, got {stiffness_N_per_m}."
+            )
+        if self.model_instance:
+            raise ValueError(
+                "Model instance already created - call set_longitudinal_spring_support() before create_osp_model()."
+            )
+        if edge_num in self.longitudinal_spring_edges:
+            raise ValueError(f"Longitudinal spring support already defined for edge {edge_num}")
+        self.longitudinal_spring_edges.append(edge_num)
+
+        restraint = list(
+            base_restraint
+            if base_restraint is not None
+            else self.edge_support_type_dict.get(edge_num, [0, 1, 1, 0, 0, 0])
+        )
+        eq_dofs = [d for d in (2, 3, 4, 5, 6) if restraint[d - 1]]
+
+        spring_material = create_material(ops_mat_type="Elastic", E=stiffness)
+        spring_section = create_section(op_ele_type="zeroLength")
+        spring_member = create_member(section=spring_section, material=spring_material)
+        material_tag = self._write_material(member=spring_member)
+
+        edge_beam_zgroups = self._overhang_edge_beam_zgroups()
+        node_tag_list = [
+            key
+            for key, val in self.Mesh_obj.edge_node_recorder.items()
+            if val == edge_num and self.Mesh_obj.node_spec[key]["z_group"] not in edge_beam_zgroups
+        ]
+
+        ele_tag_to_command_dict = {}
+        for node_tag in node_tag_list:
+            spec = self.Mesh_obj.node_spec[node_tag]
+            ground_node = max(self.Mesh_obj.node_spec.keys()) + 1
+            self.Mesh_obj.node_spec[ground_node] = {
+                "tag": ground_node,
+                "coordinate": list(spec["coordinate"]),
+                "x_group": spec["x_group"],
+                "z_group": spec["z_group"],
+            }
+            ele_count = self.global_ele_counter
+            self.global_ele_counter += 1
+            ele_tag_to_command_dict[ele_count] = (
+                f'ops.element("zeroLength",{ele_count},*[{ground_node},{node_tag}],'
+                f'\'-mat\',{material_tag},\'-dir\',1)\n'
+            )
+            del self.Mesh_obj.edge_node_recorder[node_tag]
+            self.longitudinal_spring_node_pairs[ground_node] = (node_tag, eq_dofs)
 
         self.element_command_list.update(ele_tag_to_command_dict)
 
@@ -1976,6 +2059,8 @@ class OspGrillage:
                             )
                     elif isinstance(nested_list_of_load, PatchLoading):
                         load_str += self._assign_patch_load(nested_list_of_load)
+                    elif isinstance(nested_list_of_load, ThermalElementLoad):
+                        load_str += nested_list_of_load.get_nodal_load_calls()
             # else, a single load type, assign it as it is
             else:
                 # run single assignment of load type (load_obj is a load class)
@@ -2012,6 +2097,8 @@ class OspGrillage:
                         )
                 elif isinstance(load_obj, PatchLoading):
                     load_str += self._assign_patch_load(load_obj)
+                elif isinstance(load_obj, ThermalElementLoad):
+                    load_str += load_obj.get_nodal_load_calls()
 
         return load_str
 
@@ -2805,6 +2892,8 @@ class Analysis:
         self.node_disp = dict()  # key node tag, val list of dof
         self.node_vel = dict()  # key node tag, val list of dof
         self.node_accel = dict()  # key node tag, val list of dof
+        self.node_reactions = dict()  # key node tag, val [Fx, Fy, Fz, Mx, My, Mz]
+        self.load_case_factors = []
         self.ele_force = (
             dict()
         )  # key ele tag, val list of forces on nodes of ele[ order according to ele tag]
@@ -2891,6 +2980,7 @@ class Analysis:
             "pattern": pattern_command,
             "load_command": load_str,
         }
+        self.load_case_factors.append(float(load_factor) if load_factor is not None else 1.0)
         self.load_cases_dict_list.append(time_series_dict)  # add dict to list
 
     def evaluate_analysis(self):
@@ -2943,6 +3033,44 @@ class Analysis:
             self._ops.command_log,
         )
 
+    def _collect_thermal_fixed_end_actions(self):
+        """Sum fixed-end thermal nodal action vectors over all ThermalElementLoad entries in this run."""
+        fth_local: dict[int, list[float]] = {}
+        fth_global: dict[int, list[float]] = {}
+        lc_obj = getattr(self, "load_cases_obj", None)
+        if lc_obj is None:
+            return fth_local, fth_global
+        case_factor = self.load_case_factors[0] if self.load_case_factors else 1.0
+        for entry in getattr(lc_obj, "load_groups", []):
+            load_obj = entry.get("load")
+            entry_factor = entry.get("factor", 1.0)
+            scale = float(1.0 if entry_factor is None else entry_factor) * float(case_factor)
+            if scale == 0.0:
+                continue
+            children = (
+                list(load_obj.compound_load_obj_list)
+                if isinstance(load_obj, CompoundLoad)
+                else [load_obj]
+            )
+            for child in children:
+                if not isinstance(child, ThermalElementLoad):
+                    continue
+                for etag, vec in child.element_fth_local.items():
+                    acc = fth_local.get(etag)
+                    if acc is None:
+                        fth_local[etag] = [scale * float(x) for x in vec]
+                    else:
+                        for i, x in enumerate(vec):
+                            acc[i] += scale * float(x)
+                for etag, vec in child.element_fth_global.items():
+                    acc = fth_global.get(etag)
+                    if acc is None:
+                        fth_global[etag] = [scale * float(x) for x in vec]
+                    else:
+                        for i, x in enumerate(vec):
+                            acc[i] += scale * float(x)
+        return fth_local, fth_global
+
     # function to extract grillage model responses (dx,dy,dz,rotx,roty,rotz,N,Vy,Vz,Mx,My,Mz) and store to Result class
     def extract_grillage_responses(self):
         """
@@ -2952,21 +3080,33 @@ class Analysis:
         :returns: None. Results are stored in the ``global_ele_force`` and ``node_disp`` instance variables.
         """
         if not self.pyfile:
-            # first loop extract node displacements
+            ops.reactions()
+            # first loop extract node displacements and support reactions
             for node_tag in ops.getNodeTags():
                 disp_list = ops.nodeDisp(node_tag)
                 vel_list = ops.nodeVel(node_tag)
                 accel_list = ops.nodeAccel(node_tag)
+                rxn_list = ops.nodeReaction(node_tag)
                 self.node_disp.setdefault(node_tag, disp_list)
                 self.node_vel.setdefault(node_tag, vel_list)
                 self.node_accel.setdefault(node_tag, accel_list)
+                self.node_reactions.setdefault(node_tag, list(rxn_list))
 
-            # loop through all elements in Mesh, extract local forces
+            fth_local, fth_global = self._collect_thermal_fixed_end_actions()
+
+            # loop through all elements in Mesh, extract local/global forces
+            # and subtract equivalent fixed-end thermal actions (K q - f_th)
             for ele_tag in ops.getEleTags():
-                ele_force = ops.eleResponse(ele_tag, "localForces")
+                ele_force = list(ops.eleResponse(ele_tag, "localForces"))
+                if ele_tag in fth_local and len(ele_force) == len(fth_local[ele_tag]):
+                    ele_force = [float(a) - float(b) for a, b in zip(ele_force, fth_local[ele_tag])]
                 self.ele_force.setdefault(ele_tag, ele_force)
-                global_ele_force = ops.eleResponse(ele_tag, "forces")
+
+                global_ele_force = list(ops.eleResponse(ele_tag, "forces"))
+                if ele_tag in fth_global and len(global_ele_force) == len(fth_global[ele_tag]):
+                    global_ele_force = [float(a) - float(b) for a, b in zip(global_ele_force, fth_global[ele_tag])]
                 self.global_ele_force.setdefault(ele_tag, global_ele_force)
+
                 # Shell stress resultants at Gauss points (32 values for
                 # 4-node shells: 8 per GP × 4 GPs).  Empty for beam elements.
                 ele_stress = ops.eleResponse(ele_tag, "stresses")
@@ -2990,8 +3130,11 @@ class Results:
         self.basic_load_case_record = dict()
         self.basic_load_case_record_global_forces = dict()
         self.basic_load_case_record_stresses = dict()  # shell stress resultants
+        self.basic_load_case_record_reactions = dict()  # nodal reactions [Fx,Fy,Fz,Mx,My,Mz]
         self.moving_load_case_record = []
         self.moving_load_case_record_global_forces = []
+        self.moving_load_case_record_reactions = []
+        self.reaction_component = ["Fx", "Fy", "Fz", "Mx", "My", "Mz"]
         self.moving_load_counter = 0
         self.result = None
         # store mesh data of holding model
@@ -3118,7 +3261,8 @@ class Results:
                 ele_nodes = ops.eleNodes(ele_num)
                 ele_nodes_dict.update({ele_num: ele_nodes})
             self.basic_load_case_record.setdefault(
-                analysis_obj.analysis_name, [node_disp, ele_force_dict, ele_nodes_dict]
+                analysis_obj.analysis_name,
+                [node_disp, node_vel, node_accel, ele_force_dict, ele_nodes_dict],
             )
 
             # repeat to extract global forces instead
@@ -3146,6 +3290,10 @@ class Results:
                 self.basic_load_case_record_stresses.setdefault(
                     analysis_obj.analysis_name, ele_stress_dict,
                 )
+            if analysis_obj.node_reactions:
+                self.basic_load_case_record_reactions.setdefault(
+                    analysis_obj.analysis_name, dict(analysis_obj.node_reactions),
+                )
 
         # if moving load, input is a list of analysis obj
         elif list_of_inc_analysis:
@@ -3153,6 +3301,7 @@ class Results:
             inc_load_case_global_force_record = (
                 dict()
             )  # inc_load_case_record but with forces in global
+            inc_reaction_record = dict()
 
             for inc_analysis_obj in list_of_inc_analysis:
                 # compile ele forces for each node
@@ -3171,7 +3320,7 @@ class Results:
 
                 inc_load_case_record.setdefault(
                     inc_analysis_obj.analysis_name,
-                    [node_disp, ele_force_dict, ele_nodes_dict],
+                    [node_disp, node_vel, node_accel, ele_force_dict, ele_nodes_dict],
                 )
                 for ele_num, ele_forces in inc_analysis_obj.global_ele_force.items():
                     ele_force_global_dict.update({ele_num: ele_forces})
@@ -3185,11 +3334,16 @@ class Results:
                         ele_nodes_dict,
                     ],
                 )
+                if inc_analysis_obj.node_reactions:
+                    inc_reaction_record.setdefault(
+                        inc_analysis_obj.analysis_name, dict(inc_analysis_obj.node_reactions),
+                    )
 
             self.moving_load_case_record.append(inc_load_case_record)
             self.moving_load_case_record_global_forces.append(
                 inc_load_case_global_force_record
             )
+            self.moving_load_case_record_reactions.append(inc_reaction_record)
 
     def compile_data_array(self, local_force_option=True, main_ele_tags=None):
         """
@@ -3239,33 +3393,35 @@ class Results:
 
         # loop all basic load case
         for load_case_name, resp_list_of_2_dict in basic_dict.items():
-            # extract displacement
+            # extract displacement ordered identically to mesh_obj.node_spec keys
             basic_node_disp_list.append(
-                [a for a in list(resp_list_of_2_dict[0].values())]
+                [resp_list_of_2_dict[0].get(nid, [0.0] * 6) for nid in node]
             )  # list index 0 is disp
             basic_node_vel_list.append(
-                [a for a in list(resp_list_of_2_dict[1].values())]
+                [resp_list_of_2_dict[1].get(nid, [0.0] * 6) for nid in node]
             )
             basic_node_accel_list.append(
-                [a for a in list(resp_list_of_2_dict[2].values())]
+                [resp_list_of_2_dict[2].get(nid, [0.0] * 6) for nid in node]
             )
             # extract force
             basic_ele_force_list.append(
                 [a for a in list(resp_list_of_2_dict[3].values())]
             )  # list index 1 is force
-            # extract based on element type
+            # extract based on element type (exclude zeroLength spring tags >= main_ele_tags)
             base_ele_force_list_beam.append(
                 [
                     a
-                    for a in list(resp_list_of_2_dict[3].values())
-                    if len(a) == len(self.force_component)
+                    for key, a in resp_list_of_2_dict[3].items()
+                    if a is not None
+                    and len(a) == len(self.force_component)
+                    and (main_ele_tags is None or key < main_ele_tags)
                 ]
             )
             base_ele_force_list_shell.append(
                 [
                     a
                     for a in list(resp_list_of_2_dict[3].values())
-                    if len(a) == len(self.force_component_shell)
+                    if a is not None and len(a) == len(self.force_component_shell)
                 ]
             )
             if not extracted_ele_nodes_list:
@@ -3291,13 +3447,13 @@ class Results:
                 # basic_array_list.append([a + b for (a, b) in zip(list(inc_resp_list_of_2_dict[0].values()),
                 #                                                       list(inc_resp_list_of_2_dict[1].values()))])
                 basic_node_disp_list.append(
-                    [a for a in list(inc_resp_list_of_2_dict[0].values())]
+                    [inc_resp_list_of_2_dict[0].get(nid, [0.0] * 6) for nid in node]
                 )
                 basic_node_vel_list.append(
-                    [a for a in list(inc_resp_list_of_2_dict[1].values())]
+                    [inc_resp_list_of_2_dict[1].get(nid, [0.0] * 6) for nid in node]
                 )
                 basic_node_accel_list.append(
-                    [a for a in list(inc_resp_list_of_2_dict[2].values())]
+                    [inc_resp_list_of_2_dict[2].get(nid, [0.0] * 6) for nid in node]
                 )
                 if local_force_option:
                     basic_ele_force_list.append(
@@ -3462,25 +3618,39 @@ class Results:
                 result = xr.Dataset(ds_vars)
             else:
                 force_da_beam = xr.DataArray(
-                    data=force_array,
+                    data=force_array_beam,
                     dims=self.dim2,
                     coords={
                         self.dim2[0]: basic_load_case_coord,
-                        self.dim2[1]: (
-                            ele_tag if not local_force_option else ele_tag_beam
-                        ),
+                        self.dim2[1]: ele_tag_beam,
                         self.dim2[2]: self.force_component,
                     },
                 )
-                result = xr.Dataset(
-                    {
-                        "displacements": basic_da_d,
-                        "velocity": basic_da_v,
-                        "acceleration": basic_da_a,
-                        "forces": force_da_beam,
-                        "ele_nodes": ele_nodes_beam,
-                    }
-                )
+                ds_vars = {
+                    "displacements": basic_da_d,
+                    "velocity": basic_da_v,
+                    "acceleration": basic_da_a,
+                    "forces": force_da_beam,
+                    "ele_nodes": ele_nodes_beam,
+                }
+                if self.basic_load_case_record_reactions or self.moving_load_case_record_reactions:
+                    rxn_lookup = dict(self.basic_load_case_record_reactions)
+                    for inc_rxn in self.moving_load_case_record_reactions:
+                        rxn_lookup.update(inc_rxn)
+                    rxn_rows = [
+                        [rxn_lookup.get(lc_name, {}).get(nid, [0.0] * 6) for nid in node]
+                        for lc_name in basic_load_case_coord
+                    ]
+                    ds_vars["reactions"] = xr.DataArray(
+                        data=np.array(rxn_rows, dtype=float),
+                        dims=["Loadcase", "Node", "ReactionComponent"],
+                        coords={
+                            "Loadcase": basic_load_case_coord,
+                            "Node": node,
+                            "ReactionComponent": self.reaction_component,
+                        },
+                    )
+                result = xr.Dataset(ds_vars)
 
         else:  # no result return None
             result = None

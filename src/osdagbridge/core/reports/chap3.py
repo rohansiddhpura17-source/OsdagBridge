@@ -40,6 +40,8 @@ from osdagbridge.core.utils.common import (
     KEY_TL_LOWEST_MIN_TEMP,
     KEY_TL_TEMP_FALL,
     KEY_TL_TEMP_RISE,
+    KEY_TL_THERMAL_COEFF_RCC,
+    KEY_TL_THERMAL_COEFF_STEEL,
     KEY_WC_LD_LANE_TABLE_COUNT,
     KEY_WC_MATERIAL,
     KEY_WC_THICKNESS,
@@ -371,19 +373,49 @@ This section summarizes all loads applied to the bridge and the load combination
 \end{longtable}
 
 \vspace{1em}
-\begin{longtable}{|L{5.5cm}|p{10.0cm}|}
-\caption{\textbf{Temperature Load (TL) --- per IRC 6}}
+\begin{longtable}{|L{6.0cm}|p{9.5cm}|}
+\caption{\textbf{Temperature Load (TL) --- per IRC:6-2017 Cl. 215 (with Am. No. 6)}}
 \\
 \hline
 \textbf{parameter} & \textbf{value} \\
 \hline
-\textnormal{Maximum Shade Temperature} & """ + (_render_value(input_dict,'shade_temp_max')) + r""" $^\circ$C \\[6pt]
+\textnormal{Maximum Shade Air Temperature} & """ + (
+        _render_value(input_dict, KEY_TL_HIGHEST_MAX_TEMP)
+        if input_dict.get(KEY_TL_HIGHEST_MAX_TEMP) not in (None, "")
+        else _render_value(input_dict, 'shade_temp_max')
+    ) + r""" $^\circ$C \\[6pt]
 \hline
-\textnormal{Minimum Shade Temperature} & """ + (_render_value(input_dict,'shade_temp_min')) + r""" $^\circ$C \\[6pt]
+\textnormal{Minimum Shade Air Temperature} & """ + (
+        _render_value(input_dict, KEY_TL_LOWEST_MIN_TEMP)
+        if input_dict.get(KEY_TL_LOWEST_MIN_TEMP) not in (None, "")
+        else _render_value(input_dict, 'shade_temp_min')
+    ) + r""" $^\circ$C \\[6pt]
 \hline
-\textnormal{Effective Bridge Temp. Range} & """ + (_render_value(input_dict, KEY_TL_BRIDGE_TEMP_MIN)) + r""" to """ + (_render_value(input_dict, KEY_TL_BRIDGE_TEMP_MAX)) + r""" $^\circ$C \\[6pt]
+\textnormal{Thermal Expansion Coeff. ($\alpha_{steel}$ / $\alpha_{RCC}$)} & """ + (
+        _tex(str(input_dict.get(KEY_TL_THERMAL_COEFF_STEEL) or "12.0e-6"))
+    ) + r""" / """ + (
+        _tex(str(input_dict.get(KEY_TL_THERMAL_COEFF_RCC) or "12.0e-6"))
+    ) + r""" /$^\circ$C \\[6pt]
 \hline
-\textnormal{Temperature Rise / Fall for Design} & +""" + (_render_value(input_dict, KEY_TL_TEMP_RISE)) + r""" $^\circ$C / \textminus{}""" + (_render_value(input_dict, KEY_TL_TEMP_FALL)) + r""" $^\circ$C \\[6pt]
+\textnormal{Effective Bridge Temp. Range} & """ + (
+        _render_value(input_dict, KEY_TL_BRIDGE_TEMP_MIN)
+        if input_dict.get(KEY_TL_BRIDGE_TEMP_MIN) not in (None, "")
+        else _tex(str(tl_temp_min))
+    ) + r""" to """ + (
+        _render_value(input_dict, KEY_TL_BRIDGE_TEMP_MAX)
+        if input_dict.get(KEY_TL_BRIDGE_TEMP_MAX) not in (None, "")
+        else _tex(str(tl_temp_max))
+    ) + r""" $^\circ$C \\[6pt]
+\hline
+\textnormal{Temperature Rise / Fall for Design} & +""" + (
+        _render_value(input_dict, KEY_TL_TEMP_RISE)
+        if input_dict.get(KEY_TL_TEMP_RISE) not in (None, "")
+        else _tex(str(tl_rise))
+    ) + r""" $^\circ$C / \textminus{}""" + (
+        _render_value(input_dict, KEY_TL_TEMP_FALL)
+        if input_dict.get(KEY_TL_TEMP_FALL) not in (None, "")
+        else _tex(str(tl_fall))
+    ) + r""" $^\circ$C \\[6pt]
 \hline
 \end{longtable}
 

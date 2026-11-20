@@ -480,7 +480,8 @@ def _build_full_data(model, edge_dist: float = 0.0, dataset=None, lazy: bool = F
         if "reactions" in ds.data_vars:
             arr  = ds["reactions"].values
             nids = ds["reactions"].coords["Node"].values
-            cids = [str(c) for c in ds["reactions"].coords["Component"].values]
+            _rdim = "ReactionComponent" if "ReactionComponent" in ds["reactions"].coords else "Component"
+            cids = [str(c) for c in ds["reactions"].coords[_rdim].values]
             data["reactions"][str_lc] = {
                 str(int(n)): dict(zip(cids, row.tolist()))
                 for n, row in zip(nids, arr)

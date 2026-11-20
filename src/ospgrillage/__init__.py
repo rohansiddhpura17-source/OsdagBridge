@@ -86,6 +86,7 @@ __all__ = [
     "LineLoading",
     "LoadVertex",
     "LoadPoint",  # deprecated alias for LoadVertex
+    "ThermalElementLoad",
     "CompoundLoad",
     "Line",
     "ShapeFunction",

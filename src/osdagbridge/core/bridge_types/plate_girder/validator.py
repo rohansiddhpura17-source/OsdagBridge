@@ -746,11 +746,51 @@ class BridgeInputValidator:
         # ── Temperature Load ───────────────────────────────────────────────────
         elif key == KEY_TL_THERMAL_COEFF_STEEL:
             v = self._to_float(inputs.get(key))
-            if v is None: return 0.0, "Coefficient of thermal expansion for steel must be a numeric value."
+            if v is None:
+                return 12.0e-6, "Coefficient of thermal expansion for steel must be a finite numeric value."
+            if v <= 0.0 or v > 1.0e-3:
+                return 12.0e-6, "Coefficient of thermal expansion for steel must be > 0 and <= 1.0e-3 /°C."
 
         elif key == KEY_TL_THERMAL_COEFF_RCC:
             v = self._to_float(inputs.get(key))
-            if v is None: return 0.0, "Coefficient of thermal expansion for RCC must be a numeric value."
+            if v is None:
+                return 12.0e-6, "Coefficient of thermal expansion for RCC must be a finite numeric value."
+            if v <= 0.0 or v > 1.0e-3:
+                return 12.0e-6, "Coefficient of thermal expansion for RCC must be > 0 and <= 1.0e-3 /°C."
+
+        elif key in (KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP, KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX):
+            v = self._to_float(inputs.get(key))
+            if v is None:
+                return 0.0, f"Temperature '{key}' must be a finite numeric value."
+            if v < -80.0 or v > 120.0:
+                return max(-80.0, min(120.0, v)), f"Temperature '{key}' must be between -80°C and 120°C."
+            if key in (KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP):
+                tmax = self._to_float(inputs.get(KEY_TL_HIGHEST_MAX_TEMP))
+                tmin = self._to_float(inputs.get(KEY_TL_LOWEST_MIN_TEMP))
+                if tmax is not None and tmin is not None and tmax < tmin:
+                    return tmin, "Highest maximum air temperature must be >= lowest minimum air temperature."
+            if key in (KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX):
+                bmax = self._to_float(inputs.get(KEY_TL_BRIDGE_TEMP_MAX))
+                bmin = self._to_float(inputs.get(KEY_TL_BRIDGE_TEMP_MIN))
+                if bmax is not None and bmin is not None and bmax < bmin:
+                    return bmin, "Effective maximum bridge temperature must be >= minimum bridge temperature."
+
+        elif key in (KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL):
+            v = self._to_float(inputs.get(key))
+            if v is None:
+                return 0.0, f"Temperature differential '{key}' must be a finite numeric value."
+            if v < 0.0 or v > 200.0:
+                return max(0.0, min(200.0, v)), f"Temperature differential '{key}' must be between 0°C and 200°C."
+
+        elif key == "temperature_load_kN_m2":
+            raw = inputs.get(key)
+            if raw not in (None, ""):
+                v = self._to_float(raw)
+                if v is None or v != 0.0:
+                    return 0.0, (
+                        "Legacy 'temperature_load_kN_m2' represents vertical deck pressure, "
+                        "not thermal eigenstrain; remove it and configure canonical KEY_TL_* thermal inputs."
+                    )
 
         # ═══LOADING-TAB-VALIDATORS-ENDS══════════════════════════════════════════════════════════════════
 

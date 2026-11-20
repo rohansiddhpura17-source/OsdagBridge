@@ -1,4 +1,5 @@
 import ospgrillage as og
+from ospgrillage.load import ThermalElementLoad
 import xarray as xr
 # from math import sqrt, pi
 # import openseespy.opensees as ops
@@ -148,7 +149,8 @@ class BridgeGrillageModel:
                         girder_sections: list[SectionProperties],
                         edge_longitudinal: SectionProperties,
                         transverse: SectionProperties,
-                        end_transverse: SectionProperties):
+                        end_transverse: SectionProperties,
+                        steel_girder_sections: list[SectionProperties] | None = None):
         """
         Creates all grillage sections from user-supplied SectionProperties.
 
@@ -163,12 +165,20 @@ class BridgeGrillageModel:
             Properties for the transverse slab (unit_width=True).
         end_transverse : SectionProperties
             Properties for the end transverse slab.
+        steel_girder_sections : list[SectionProperties], optional
+            Bare-steel girder sections used for girder self-weight calculation
+            when ``girder_sections`` carries transformed composite properties.
         """
         if not girder_sections:
             raise ValueError("create_sections requires at least one girder section.")
 
         # Per-girder DTOs and ospgrillage sections.
         self.girder_props = list(girder_sections)
+        self.steel_girder_props = (
+            list(steel_girder_sections)
+            if steel_girder_sections is not None
+            else list(girder_sections)
+        )
         self.girder_sections = [
             og.create_section(A=s.A, J=s.J, Iz=s.Iz, Iy=s.Iy, Az=s.Az, Ay=s.Ay)
             for s in girder_sections
@@ -253,7 +263,13 @@ class BridgeGrillageModel:
     # ============================================================
     #   CREATE THE GRILLAGE MODEL
     # ============================================================
-    def create_model(self):
+    def create_model(
+        self,
+        left_support: str = "Pinned",
+        right_support: str = "Roller",
+        k_left_kN_m: float | None = None,
+        k_right_kN_m: float | None = None,
+    ):
 
         # -------------------------------------------------
         # Load placement manager
@@ -279,6 +295,29 @@ class BridgeGrillageModel:
             ext_to_int_dist=self.ext_to_int_dist,
             mesh_type="Oblique"  # ('Ortho' or 'Oblique')
         )
+
+        # Explicit support & bearing boundary mapping per bridge support selections
+        restraint_map = {
+            "Pinned": [1, 1, 1, 0, 0, 0],
+            "Roller": [0, 1, 1, 0, 0, 0],
+            "Fixed":  [1, 1, 1, 1, 1, 1],
+        }
+        left_vec = restraint_map.get(str(left_support).strip(), [1, 1, 1, 0, 0, 0])
+        right_vec = restraint_map.get(str(right_support).strip(), [0, 1, 1, 0, 0, 0])
+        self.model.set_boundary_condition(edge_group_counter=0, new_restraint_vector=left_vec)
+        self.model.set_boundary_condition(edge_group_counter=1, new_restraint_vector=right_vec)
+        if k_left_kN_m is not None:
+            self.model.set_longitudinal_spring_support(
+                stiffness_N_per_m=float(k_left_kN_m) * 1000.0,
+                edge_num=0,
+                base_restraint=left_vec,
+            )
+        if k_right_kN_m is not None:
+            self.model.set_longitudinal_spring_support(
+                stiffness_N_per_m=float(k_right_kN_m) * 1000.0,
+                edge_num=1,
+                base_restraint=right_vec,
+            )
 
         # Assign members — one section per main girder.
         self._assign_girder_members()
@@ -391,8 +430,10 @@ class BridgeGrillageModel:
         start_beam = 0
         end_beam = L
 
-        # Per-girder areas ordered by ascending transverse (z) position.
-        girder_areas = [p.A for p in self.girder_props]
+        # Per-girder bare-steel areas ordered by ascending transverse (z) position
+        # so girder self-weight never double-counts concrete deck stiffness.
+        sw_props = getattr(self, "steel_girder_props", None) or self.girder_props
+        girder_areas = [p.A for p in sw_props]
 
         # Ordered transverse positions of the main girders (ascending z); used to
         # map each loaded grid line back to its girder index.
@@ -908,72 +949,160 @@ class BridgeGrillageModel:
             temperature_load_kN_m2: float | None = None,
             partial_safety_factor: float = 1.0,
     ):
+        """Reject legacy vertical pressure substitute for thermal actions (Issue #92).
+
+        Use :meth:`create_thermal_load_cases` with validated IRC:6 Cl. 215
+        thermal eigenstrain inputs instead of applying a pressure load.
         """
-        Creates a uniform temperature load as a patch load over the full bridge
-        deck footprint (same extents as the deck slab load).
-
-        The load represents the equivalent transverse effect of a temperature
-        differential on the bridge superstructure per IRC:6-2017 Cl.215.
-
-        Parameters
-        ----------
-        temperature_load_kN_m2 : float
-            Temperature load intensity in kN/m² (required).
-        partial_safety_factor : float
-            Partial safety factor applied to the ``"{psf} TL"`` load case.
-            Default is 1.0.
-
-        The created load case is stored on ``self.temperature_load_case``.
-        """
-        model = model or self.model
-        if model is None:
-            raise ValueError("Model is not available. Create model before adding loads.")
-
-        if temperature_load_kN_m2 is None:
+        if temperature_load_kN_m2 is not None and float(temperature_load_kN_m2) != 0.0:
             raise ValueError(
-                "create_temperature_load requires temperature_load_kN_m2 (in kN/m²) "
-                "so the patch load magnitude can be set."
+                "create_temperature_load(): 'temperature_load_kN_m2' represents a "
+                "vertical deck patch pressure, not thermal expansion/gradient strain. "
+                "Use canonical KEY_TL_* thermal inputs instead."
             )
-
-        tl_mag = temperature_load_kN_m2 * kN / m**2  # N/m²
-        print(f"Temperature load magnitude: {tl_mag:.2f} N/m²")
-
-        # -------------------------------------------------
-        # Get geometry from load manager (full deck footprint)
-        # -------------------------------------------------
-        geom = self.load_manager.deck_load()
-
-        # -------------------------------------------------
-        # Convert geometry → ospgrillage vertices
-        # -------------------------------------------------
-        p1 = og.create_load_vertex(x=geom.p1.x, z=geom.p1.z, p=tl_mag)
-        p2 = og.create_load_vertex(x=geom.p2.x, z=geom.p2.z, p=tl_mag)
-        p3 = og.create_load_vertex(x=geom.p3.x, z=geom.p3.z, p=tl_mag)
-        p4 = og.create_load_vertex(x=geom.p4.x, z=geom.p4.z, p=tl_mag)
-
-        # -------------------------------------------------
-        # Create patch load
-        # -------------------------------------------------
-        temp_load = og.create_load(
-            loadtype="patch",
-            name="temperature load",
-            point1=p1,
-            point2=p2,
-            point3=p3,
-            point4=p4,
+        raise ValueError(
+            "create_temperature_load() is deprecated; call create_thermal_load_cases() "
+            "with canonical thermal eigenstrain parameters."
         )
 
-        # -------------------------------------------------
-        # Create & register load case
-        # -------------------------------------------------
-        TL = og.create_load_case(name=f"{partial_safety_factor} TL")
-        TL.add_load(temp_load)
-        model.add_load_case(TL, load_factor=partial_safety_factor)
+    def create_thermal_load_cases(
+        self,
+        thermal_spec: dict,
+        girder_layers_list: list[list[dict]],
+        E_s_Pa: float,
+        t_slab_m: float,
+        model=None,
+    ) -> dict:
+        """Create and register native OpenSeesPy equivalent-nodal thermal load cases.
 
-        # store reference
+        Builds:
+          - ``TL_UNIFORM_RISE`` : uniform bridge temperature rise (+delta_T_rise)
+          - ``TL_UNIFORM_FALL`` : uniform bridge temperature fall (-delta_T_fall)
+          - ``TL_GRADIENT_HEAT`` (when gradient enabled and deck slab > 0)
+          - ``TL_GRADIENT_COOL`` (when gradient enabled and deck slab > 0)
+          - ``1.0 TL``           : governing positive thermal case (rise + gradient heat)
+                                   stored on ``self.temperature_load_case`` for IRC:6
+                                   Table B.2/B.3 ULS/SLS combinations.
+        """
+        from osdagbridge.core.bridge_types.plate_girder.thermal_analysis import (
+            build_thermal_element_load,
+            compute_composite_thermal_section,
+        )
+
+        model = model or self.model
+        if model is None:
+            raise ValueError("Model is not available. Create model before adding thermal loads.")
+
+        zg = model.common_grillage_element_z_group
+        long_cats = (
+            "edge_beam", "exterior_main_beam_1",
+            "interior_main_beam", "exterior_main_beam_2",
+        )
+        all_long_groups = sorted({g for cat in long_cats for g in zg.get(cat, [])})
+        main_groups = all_long_groups[1:-1] if self.edge_dist > 0 else all_long_groups
+
+        def _member_for_group(g: int) -> str:
+            for cat in (
+                "exterior_main_beam_1", "exterior_main_beam_2",
+                "interior_main_beam", "edge_beam",
+            ):
+                if g in zg.get(cat, []):
+                    return cat
+            raise ValueError(f"z_group {g} not found in longitudinal categories")
+
+        girder_elements: list[list[int]] = []
+        for g in main_groups:
+            cat = _member_for_group(g)
+            z_idx = zg[cat].index(g)
+            eles = model.get_element(member=cat, options="elements", z_group_num=z_idx)
+            girder_elements.append([int(e) for e in eles])
+
+        n_girders = len(girder_elements)
+        dT_rise = float(thermal_spec["delta_T_rise_C"])
+        dT_fall = float(thermal_spec["delta_T_fall_C"])
+        include_grad = bool(thermal_spec.get("include_gradient", True)) and float(t_slab_m) > 0.0
+
+        gr_heat = (
+            IRC6_2017.cl_215_4_temperature_gradient(float(t_slab_m), gradient_type="heating")
+            if include_grad else None
+        )
+        gr_cool = (
+            IRC6_2017.cl_215_4_temperature_gradient(float(t_slab_m), gradient_type="cooling")
+            if include_grad else None
+        )
+
+        def _layers_for(idx: int) -> list[dict]:
+            return girder_layers_list[idx] if idx < len(girder_layers_list) else girder_layers_list[-1]
+
+        def _assemble_case(case_name: str, dT_fn) -> tuple[ThermalElementLoad, list[dict]]:
+            per_ele_strains: dict[int, tuple[float, float]] = {}
+            per_girder_props: list[dict] = []
+            for gi in range(n_girders):
+                sec = compute_composite_thermal_section(
+                    layers=_layers_for(gi),
+                    E_ref_Pa=float(E_s_Pa),
+                    dT_fn=dT_fn,
+                )
+                per_girder_props.append(sec)
+                strain_pair = (sec["free_axial_strain"], sec["free_curvature_per_m"])
+                for eid in girder_elements[gi]:
+                    per_ele_strains[eid] = strain_pair
+            load_obj = build_thermal_element_load(
+                model=model,
+                name=case_name,
+                per_element_strains=per_ele_strains,
+                metadata={"case_name": case_name},
+            )
+            return load_obj, per_girder_props
+
+        created_cases = {}
+        section_summaries = {}
+
+        def _register_single(lc_name: str, load_obj) -> None:
+            lc = og.create_load_case(name=lc_name)
+            lc.add_load(load_obj)
+            model.add_load_case(lc)
+            created_cases[lc_name] = lc
+
+        rise_load, rise_props = _assemble_case("TL_UNIFORM_RISE", lambda y, D: dT_rise)
+        _register_single("TL_UNIFORM_RISE", rise_load)
+        section_summaries["TL_UNIFORM_RISE"] = rise_props
+
+        fall_load, fall_props = _assemble_case("TL_UNIFORM_FALL", lambda y, D: -dT_fall)
+        _register_single("TL_UNIFORM_FALL", fall_load)
+        section_summaries["TL_UNIFORM_FALL"] = fall_props
+
+        if include_grad and gr_heat is not None and gr_cool is not None:
+            heat_fn = lambda y, D: float(gr_heat["T_at_y"](max(0.0, D - y)))
+            cool_fn = lambda y, D: -float(gr_cool["T_at_y"](max(0.0, D - y)))
+            gh_load, gh_props = _assemble_case("TL_GRADIENT_HEAT", heat_fn)
+            _register_single("TL_GRADIENT_HEAT", gh_load)
+            section_summaries["TL_GRADIENT_HEAT"] = gh_props
+
+            gc_load, gc_props = _assemble_case("TL_GRADIENT_COOL", cool_fn)
+            _register_single("TL_GRADIENT_COOL", gc_load)
+            section_summaries["TL_GRADIENT_COOL"] = gc_props
+
+            gov_fn = lambda y, D: dT_rise + float(gr_heat["T_at_y"](max(0.0, D - y)))
+            gov_load, gov_props = _assemble_case("1.0 TL", gov_fn)
+        else:
+            gov_load, gov_props = _assemble_case("1.0 TL", lambda y, D: dT_rise)
+
+        TL = og.create_load_case(name="1.0 TL")
+        TL.add_load(gov_load)
+        model.add_load_case(TL, load_factor=1.0)
+        created_cases["1.0 TL"] = TL
+        section_summaries["1.0 TL"] = gov_props
+
         self.temperature_load_case = TL
-
-        return TL
+        self.thermal_load_cases = created_cases
+        self.thermal_section_summaries = section_summaries
+        return {
+            "load_cases": list(created_cases.keys()),
+            "section_summaries": section_summaries,
+            "gradient_heat_T1_C": gr_heat["T1"] if gr_heat else 0.0,
+            "gradient_cool_T1_C": gr_cool["T1"] if gr_cool else 0.0,
+        }
 
     # ============================================================
     #   Seismic / Earthquake Load

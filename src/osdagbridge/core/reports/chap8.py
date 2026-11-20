@@ -106,10 +106,10 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
 \textbf{Structural Analysis}
 
 \begin{itemize}
-    \item All girders are modelled as simply supported; continuous spans are not currently supported.
-    \item A 3D grillage model (OSPGrillage) is used for load distribution. Grillage members carry composite section properties after the construction stage.
-    \item The transverse member forces are computed using an approximate 2D frame analogy. For irregular or skewed geometries, a 3D FEM is recommended.
-    \item Fixed bearing stiffness is modelled as $k = 1{,}000{,}000 \,\text{kN/m}$ (virtually rigid); free/expansion bearing as $k = 100 \, \text{kN/m}$.
+    \item All girders are modelled as simply supported single-span bridges (supports selectable as Pinned, Roller, Fixed, or optional finite longitudinal bearing springs); continuous spans are not currently supported.
+    \item A 3D grillage model (OSPGrillage / OpenSeesPy) is used for load distribution. When thermal loading is active, longitudinal girders carry transformed composite steel--concrete properties ($A_{eq}, I_{z,eq}$ referenced to $E_s$) with exact element-local internal force recovery ($K_{local} q_{local} - f_{th,local}$).
+    \item The transverse member forces are computed using an approximate 2D frame analogy. For irregular or heavily skewed geometries, a full 3D finite-element analysis is recommended.
+    \item In analytical bearing summary mode, default fixed-bearing stiffness is $k = 1{,}000{,}000 \,\text{kN/m}$ and free/expansion bearing is $k = 100 \, \text{kN/m}$, unless explicit longitudinal spring stiffnesses are specified on the structural model.
     \item Construction stage sequence analysis is approximate. Detailed staged analysis should be performed for long-term deflection checks.
 \end{itemize}
 
@@ -151,6 +151,7 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
 \item Multi-lane live load reduction factors per IRC 6:2017 Cl.204.4 Table 6A: 1st lane = 1.0, 2nd lane = 0.8, 3rd lane onwards = 0.4.
 \item Impact factor (dynamic load allowance) computed from span per IRC 6:2017 Cl.208.2/208.3.
 \item Wind load applied as transverse, longitudinal, and vertical components per IRC 6:2017 Cl.209.3.3--209.3.5.
+\item Thermal loading follows IRC:6-2017 Cl. 215 (including Amendment No. 6 May 2021 default CTE $12.0 \times 10^{-6}/^\circ\mathrm{C}$ when user CTE is omitted, Table 15 effective temperature bounds, Cl. 215.4 composite heating/cooling gradients, Amendment No. 8 Tables B.2/B.3 factors, and Amendment No. 10 support restraint vs bearing friction terminology).
 \end{itemize}
 
 \textbf{Serviceability Limits}
@@ -182,11 +183,11 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
 \begin{itemize}
 \item Substructure (piers, pile caps, foundations) and bearing design are not included.
 \item Splice connection design is not implemented.
-\item Skew angle $>$ 15 degrees requires independent manual analysis (IRC 24 Cl. 504.8).
+\item Skew angle $>$ 15 degrees requires independent manual analysis (IRC 24 Cl. 504.8); thermal grillage analysis explicitly rejects $|skew| > 15^\circ$.
 \item Construction stage sequence analysis is approximate; detailed staged analysis
   should be performed for long-term deflection checks.
-\item The grillage analysis assumes simply supported boundary conditions;
-  continuous spans are not currently supported.
+\item The grillage analysis assumes simply supported single-span boundary conditions (or explicit longitudinal bearing spring stiffnesses); continuous multi-span bridges are not currently supported.
+\item Thermal eigenstrain in the current 3D grillage solver acts along the structural longitudinal composite girders; transverse deck slab thermal expansion across Z-restrained abutment supports is not applied.
 \end{itemize}
 """)
 

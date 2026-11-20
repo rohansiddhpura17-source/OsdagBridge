@@ -225,6 +225,7 @@ class PlateGirderAnalysisResults:
         envelope_uls      = []
         envelope_sls      = []
         dl_ll_cases       = []
+        thermal_loads     = []
 
         for lc in all_lc:
             name       = str(lc)
@@ -272,6 +273,11 @@ class PlateGirderAnalysisResults:
                 vehicle_static.append(lc)
                 continue
 
+            # Thermal load cases (IRC:6-2017 Cl. 215 uniform & gradient)
+            if name.startswith("TL_") or name == "1.0 TL" or name.endswith(" TL") or name == "TL":
+                thermal_loads.append(lc)
+                continue
+
             # Self-weight individual case
             if name == "SW":
                 sw_cases.append(lc)
@@ -284,6 +290,7 @@ class PlateGirderAnalysisResults:
         return {
             "all":                  all_lc,
             "dead":                 dead_loads,
+            "thermal":              thermal_loads,
             "vehicle_static":       vehicle_static,
             "vehicle_moving":       [],          # moving load cases removed from analyser
             "sw":                   sw_cases,
@@ -341,14 +348,22 @@ class PlateGirderAnalysisResults:
     # GRILLAGE CONNECTIVITY
     # ========================================================
     def build_grillage_connectivity(self):  # connectivity between nodes[raph for bfs]
-
+        ground_nodes = (
+            set(getattr(self.model, "longitudinal_spring_node_pairs", {}).keys())
+            | set(getattr(self.model, "spring_node_pairs", {}).keys())
+        )
         nodes = {}
         for n in ops.getNodeTags():
+            if n in ground_nodes:
+                continue
             nodes[n] = ops.nodeCoord(n)
 
         elements = {}
         for e in ops.getEleTags():
-            elements[e] = ops.eleNodes(e)
+            conn = ops.eleNodes(e)
+            if any(nid in ground_nodes for nid in conn):
+                continue
+            elements[e] = conn
 
         adj = defaultdict(set)
 
