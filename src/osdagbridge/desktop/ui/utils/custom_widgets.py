@@ -7,6 +7,8 @@ Provides enhanced combobox views with:
 - Better UX feedback for selectable vs non-selectable items
 """
 
+import math
+
 from PySide6.QtWidgets import (
     QListView, QStyledItemDelegate, QWidget, QVBoxLayout,
     QSizePolicy, QRadioButton, QSpinBox, QDoubleSpinBox, QPushButton, QScrollArea, QFrame, QLabel, QHBoxLayout
@@ -226,8 +228,8 @@ class _BarPainter(QWidget):
         h = self.height()
         radius = h / 2.0
 
-        exceeded   = self._value >= 100.0
-        fill_ratio = min(self._value / 150.0, 1.0)
+        exceeded   = (not math.isfinite(self._value)) or self._value >= 100.0
+        fill_ratio = 1.0 if not math.isfinite(self._value) else min(self._value / 150.0, 1.0)
         fill_w     = w * fill_ratio
 
         painter.setPen(Qt.NoPen)
@@ -323,6 +325,8 @@ class PercentBarWidget(QWidget):
 
     @staticmethod
     def _fmt(value: float) -> str:
+        if not math.isfinite(value):
+            return "INF"
         return f"{int(round(value))}%"
 
 # -- Custom Green Radio Button -----------------------------------------------

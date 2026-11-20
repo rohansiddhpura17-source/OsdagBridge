@@ -269,8 +269,8 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
         # Find bracing section properties from outputs or skip if not present
         bracing_area = 0.0
         bracing_len = 0.0
-        top_chord_enabled = True
-        bot_chord_enabled = True
+        top_chord_enabled = bool(outputs.get("member_properties.cross_bracing_details.top_chord", True))
+        bot_chord_enabled = bool(outputs.get("member_properties.cross_bracing_details.bottom_chord", True))
 
         bracing_area_val = outputs.get("transverse_member_design.cb.section_properties.bracing.G1G2.A")
         top_chord_area_val = outputs.get("transverse_member_design.cb.section_properties.top_chord.G1G2.A")

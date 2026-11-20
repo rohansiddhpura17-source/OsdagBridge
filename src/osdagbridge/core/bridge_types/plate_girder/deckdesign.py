@@ -845,14 +845,20 @@ def design_deck_slab(input_dict: dict, fck: float, fctm: float, fy: float, Es: f
     # Composite interface utilization ratios (demand / capacity) — only when the
     # composite checks ran. Concrete / rebar SLS-stress URs are read back from
     # design_results (computed in Stage 5).
+    invalid_capacity_checks = []
     if has_composite:
-        def _ur(demand, capacity):
-            return round(demand / capacity, 4) if capacity > 0 else (9.999 if demand > 0 else 0.0)
-        ur_composite_trans_shear  = _ur(ts["VL_N_per_mm"], ts["governing_capacity_kN_per_m"])
-        ur_composite_crack        = _ur(crack["As_min_mm2"], crack["As_provided_mm2"])
-        ur_composite_conc_stress  = _ur(dr.get("sigma_c_actual_MPa") or 0.0,
+        def _ur(check_key, demand, capacity):
+            if capacity is not None and capacity > 0:
+                return round(demand / capacity, 4)
+            if demand is None or demand <= 0:
+                return 0.0
+            invalid_capacity_checks.append(check_key)
+            return float("inf")
+        ur_composite_trans_shear  = _ur("ur_composite_trans_shear",  ts["VL_N_per_mm"], ts["governing_capacity_kN_per_m"])
+        ur_composite_crack        = _ur("ur_composite_crack",        crack["As_min_mm2"], crack["As_provided_mm2"])
+        ur_composite_conc_stress  = _ur("ur_composite_conc_stress",  dr.get("sigma_c_actual_MPa") or 0.0,
                                         dr.get("sigma_c_limit_MPa") or 0.0)
-        ur_composite_rebar_stress = _ur(dr.get("sigma_rebar_actual_MPa") or 0.0,
+        ur_composite_rebar_stress = _ur("ur_composite_rebar_stress", dr.get("sigma_rebar_actual_MPa") or 0.0,
                                         dr.get("sigma_rebar_limit_MPa") or 0.0)
 
     sls_lines = [
@@ -1033,6 +1039,7 @@ def design_deck_slab(input_dict: dict, fck: float, fctm: float, fy: float, Es: f
             "ur_composite_crack"        : ur_composite_crack,
             "ur_composite_conc_stress"  : ur_composite_conc_stress,
             "ur_composite_rebar_stress" : ur_composite_rebar_stress,
+            "invalid_capacity_checks"   : list(invalid_capacity_checks),
         })
 
     # ── 14. report values dict (keyed to common.KEY_DD_*) ──────────────

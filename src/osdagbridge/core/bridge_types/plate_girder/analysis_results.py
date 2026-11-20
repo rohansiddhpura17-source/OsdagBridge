@@ -132,12 +132,15 @@ EXAMPLE USAGE
     results.run_interactive_viewer()
 """
 
+import logging
 import math
 from collections import defaultdict, deque
 import openseespy.opensees as ops
 import pandas as pd
 from osdagbridge.core.utils.common import kN, m, m2
 from osdagbridge.core.utils.codes.irc6_2017 import IRC6_2017
+
+logger = logging.getLogger(__name__)
 
 
 class PlateGirderAnalysisResults:
@@ -1376,7 +1379,8 @@ class PlateGirderAnalysisResults:
                         sw_mag_map[round(pts[0].z, 3)] = pts[0].p / 1000.0
         
         sw_data = []
-        total_v_audit = 0
+        total_v_audit = 0.0
+        missing_sw_girders = []
         for g_name, g_data in girder_map.items():
             s, e = nodes[g_data["start"]], nodes[g_data["end"]]
             z_key = round(s[2], 3)
@@ -1385,19 +1389,24 @@ class PlateGirderAnalysisResults:
                 nearest_z = min(sw_mag_map.keys(), key=lambda kz: abs(kz - z_key))
                 if abs(nearest_z - z_key) <= 1e-3:
                     val = sw_mag_map[nearest_z]
-            if val is None:
-                val = 0.0
             L = math.sqrt((e[0]-s[0])**2 + (e[2]-s[2])**2)
-            total_v_audit += val * L
+            if val is None:
+                missing_sw_girders.append(g_name)
+                logger.warning("Girder self-weight missing for %s (z=%.3f m).", g_name, s[2])
+                val_display = None
+            else:
+                total_v_audit += val * L
+                val_display = round(val, 2)
             
             sw_data.append({
                 "Girder": g_name, "Type": "Line",
                 "Start X": round(s[0], 3), "Start Y": round(s[1], 3), "Start Z": round(s[2], 3),
                 "End X": round(e[0], 3), "End Y": round(e[1], 3), "End Z": round(e[2], 3),
-                "Value (kN/m)": round(val, 2)
+                "Value (kN/m)": val_display
             })
         df = pd.DataFrame(sw_data)
-        df.attrs["total_v"] = total_v_audit
+        df.attrs["missing_sw_girders"] = missing_sw_girders
+        df.attrs["total_v"] = None if missing_sw_girders else total_v_audit
         return df
 
     def _get_dead_lc_df(self, display_name, lc):
@@ -1559,7 +1568,12 @@ class PlateGirderAnalysisResults:
         print(f"\n{'='*110}\n>>> GIRDER SELF WEIGHT\n{'-'*110}")
         if not df.empty:
             print(df.to_string(index=False))
-            print(f"\nTotal Vertical Self-Weight: {df.attrs.get('total_v', 0):.2f} kN")
+            total_v = df.attrs.get("total_v")
+            if total_v is None:
+                missing = df.attrs.get("missing_sw_girders") or []
+                print(f"\nTotal Vertical Self-Weight: UNAVAILABLE (missing SW for {', '.join(missing)})")
+            else:
+                print(f"\nTotal Vertical Self-Weight: {total_v:.2f} kN")
         print("=" * 110)
 
     def _print_single_dead_lc_extraction(self, display_name, lc):
