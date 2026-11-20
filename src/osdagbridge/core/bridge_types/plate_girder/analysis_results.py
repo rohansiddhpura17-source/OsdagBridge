@@ -1379,7 +1379,14 @@ class PlateGirderAnalysisResults:
         total_v_audit = 0
         for g_name, g_data in girder_map.items():
             s, e = nodes[g_data["start"]], nodes[g_data["end"]]
-            val = sw_mag_map.get(round(s[2], 3), 22.4)
+            z_key = round(s[2], 3)
+            val = sw_mag_map.get(z_key)
+            if val is None and sw_mag_map:
+                nearest_z = min(sw_mag_map.keys(), key=lambda kz: abs(kz - z_key))
+                if abs(nearest_z - z_key) <= 1e-3:
+                    val = sw_mag_map[nearest_z]
+            if val is None:
+                val = 0.0
             L = math.sqrt((e[0]-s[0])**2 + (e[2]-s[2])**2)
             total_v_audit += val * L
             

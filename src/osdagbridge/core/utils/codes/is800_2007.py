@@ -206,7 +206,7 @@ class IS800_2007(object):
         
         ratio = width / thickness
 
-        if section_type == 'Rolled':
+        if str(section_type).strip().lower() == 'rolled':
             if ratio <= (9.4 * epsilon):
                 section_class = 'Plastic'
             elif ratio <= (10.5 * epsilon):

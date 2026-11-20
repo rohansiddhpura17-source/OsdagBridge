@@ -1102,7 +1102,7 @@ class PlateGirderCADGenerator:
             osdag_display_shape(self.display, shapes, color=MEDIAN_COLOR, update=True, label=label, canvas=self.cad_widget)
 
 
-def osdag_display_shape(display, shapes, material=None, texture=None, color=None, transparency=None, update=False, label=[], canvas=None):
+def osdag_display_shape(display, shapes, material=None, texture=None, color=None, transparency=None, update=False, label=None, canvas=None):
     """
     Display a shape with edge styling and register with memory manager.
     
@@ -1115,10 +1115,11 @@ def osdag_display_shape(display, shapes, material=None, texture=None, color=None
     ais = ais_object[0] if isinstance(ais_object, list) else ais_object
     
     
-    if canvas.model_ais_objects.get(label[0]) is None:
-        canvas.model_ais_objects[label[0]] = [ais]
-    else:
-        canvas.model_ais_objects[label[0]] += [ais]
+    if canvas is not None and label:
+        if canvas.model_ais_objects.get(label[0]) is None:
+            canvas.model_ais_objects[label[0]] = [ais]
+        else:
+            canvas.model_ais_objects[label[0]] += [ais]
     
     # Activate selection mode for whole entity
     display.Context.Activate(ais, 0)

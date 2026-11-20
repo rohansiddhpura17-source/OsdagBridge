@@ -105,6 +105,28 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
         if span <= 0 or n_girders <= 0:
             return quantities
 
+        # Resolve custom material densities (kN/m^3 -> MT/m^3 via /10.0, kg/m^3 via *100.0)
+        concrete_density_mt = 2.5
+        try:
+            _cd = float(inputs.get("material.deck.density", 25.0))
+            if math.isfinite(_cd) and _cd > 0:
+                concrete_density_mt = _cd / 10.0
+        except Exception:
+            pass
+
+        steel_density_kg = 7850.0
+        try:
+            _sd_raw = inputs.get("material.steel.density")
+            if _sd_raw is None:
+                _sd_raw = inputs.get("material.girder.density")
+            if _sd_raw is not None:
+                _sd = float(_sd_raw)
+                if math.isfinite(_sd) and _sd > 0:
+                    steel_density_kg = _sd * 100.0 if _sd < 500.0 else _sd
+        except Exception:
+            pass
+        steel_density_mt = steel_density_kg / 1000.0
+
         # 1. Concrete deck volume (Cu.m) and Weight (MT)
         overall_width_val = inputs.get("typical_section.overall_bridge_width")
         deck_thickness_val = inputs.get(KEY_TS_DECK_THICKNESS)
@@ -118,12 +140,12 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
                     quantities["concrete_deck_vol_formula"] = f"${overall_width:.2f}\\text{{ m}} \\times {deck_thickness:.2f}\\text{{ m}} \\times {span:.2f}\\text{{ m}} = {concrete_vol:.2f}\\text{{ m}}^3$"
                     quantities["concrete_deck_qty"] = "1"
                     quantities["concrete_deck_vol_total"] = f"{concrete_vol:.2f}"
-                    quantities["concrete_deck_wt_single"] = f"{(concrete_vol * 2.5):.2f}"
-                    quantities["concrete_deck_wt_total"] = f"{(concrete_vol * 2.5):.2f}"
+                    quantities["concrete_deck_wt_single"] = f"{(concrete_vol * concrete_density_mt):.2f}"
+                    quantities["concrete_deck_wt_total"] = f"{(concrete_vol * concrete_density_mt):.2f}"
 
                     # 2. Reinforcement Steel (Cu.m) and Weight (MT)
                     rebar_wt_kg = concrete_vol * 120.0
-                    rebar_vol = rebar_wt_kg / 7850.0
+                    rebar_vol = rebar_wt_kg / steel_density_kg
                     rebar_area = rebar_vol / span if span > 0 else 0.0
                     quantities["rebar_deck_vol_formula"] = f"${rebar_area:.6f}\\text{{ m}}^2 \\times {span:.2f}\\text{{ m}} = {rebar_vol:.5f}\\text{{ m}}^3$"
                     quantities["rebar_deck_qty"] = "1"
@@ -170,20 +192,28 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
                 pass
 
         total_girder_mass = 0.0
+        girder_total_vol = 0.0
         if girder_area > 0:
             girder_vol = girder_area * span
             quantities["steel_girders_vol_formula"] = f"${girder_area:.5f}\\text{{ m}}^2 \\times {span:.2f}\\text{{ m}} = {girder_vol:.5f}\\text{{ m}}^3$"
             quantities["steel_girders_qty"] = str(n_girders)
             
-            # calculate tonnage / volume
+            # Sum actual per-girder volume and mass across G1..Gn
             for gi in range(n_girders):
+                gi_area = girder_area
+                try:
+                    _ga = float(resolve_girder_value(inputs, "member_properties.girder_details.section_properties.area", gi))
+                    if math.isfinite(_ga) and _ga > 0:
+                        gi_area = _ga
+                except Exception:
+                    pass
+                girder_total_vol += gi_area * span
                 try:
                     mass_per_m = float(resolve_girder_value(inputs, "member_properties.girder_details.section_properties.mass", gi))
                     total_girder_mass += mass_per_m * span
                 except Exception:
-                    total_girder_mass += girder_area * span * 7850.0
+                    total_girder_mass += gi_area * span * steel_density_kg
             
-            girder_total_vol = n_girders * girder_vol
             quantities["steel_girders_vol_total"] = f"{girder_total_vol:.2f}"
             
             single_girder_wt = (total_girder_mass / n_girders) / 1000.0
@@ -224,9 +254,8 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
             studs_total_vol = total_studs * stud_vol
             quantities["shear_studs_vol_total"] = f"{studs_total_vol:.2f}"
             
-            # density of steel = 7850 kg/m^3 = 7.85 tonnes/m^3
-            single_stud_wt = stud_vol * 7.85
-            total_studs_wt = studs_total_vol * 7.85
+            single_stud_wt = stud_vol * steel_density_mt
+            total_studs_wt = studs_total_vol * steel_density_mt
             quantities["shear_studs_wt_single"] = f"{single_stud_wt:.6f}"
             quantities["shear_studs_wt_total"] = f"{total_studs_wt:.3f}"
         else:
@@ -244,6 +273,8 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
         bot_chord_enabled = True
 
         bracing_area_val = outputs.get("transverse_member_design.cb.section_properties.bracing.G1G2.A")
+        top_chord_area_val = outputs.get("transverse_member_design.cb.section_properties.top_chord.G1G2.A")
+        bot_chord_area_val = outputs.get("transverse_member_design.cb.section_properties.bottom_chord.G1G2.A")
         cb_forces = outputs.get("crossbracing_forces_dict")
         bracing_len_val = None
         if cb_forces:
@@ -251,10 +282,14 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
             if cb_geom:
                 bracing_len_val = cb_geom.get("diagonal_length_m")
 
+        top_chord_area = 0.0
+        bot_chord_area = 0.0
         if bracing_area_val is not None and bracing_len_val is not None:
             try:
                 bracing_area = float(bracing_area_val) / 10000.0  # Convert cm² to m²
                 bracing_len = float(bracing_len_val)
+                top_chord_area = float(top_chord_area_val) / 10000.0 if top_chord_area_val is not None else bracing_area
+                bot_chord_area = float(bot_chord_area_val) / 10000.0 if bot_chord_area_val is not None else bracing_area
             except Exception:
                 pass
 
@@ -285,12 +320,12 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
 
             # 5a. Top Chord
             top_chord_qty = (n_girders - 1) * n_panels if top_chord_enabled else 0
-            top_chord_vol_single = bracing_area * spacing
+            top_chord_vol_single = top_chord_area * spacing
             top_chord_vol_total = top_chord_qty * top_chord_vol_single
-            top_chord_wt_single = top_chord_vol_single * 7.85
-            top_chord_wt_total = top_chord_vol_total * 7.85
+            top_chord_wt_single = top_chord_vol_single * steel_density_mt
+            top_chord_wt_total = top_chord_vol_total * steel_density_mt
             
-            quantities["bracing_top_vol_formula"] = f"${bracing_area:.5f}\\text{{ m}}^2 \\times {spacing:.2f}\\text{{ m}} = {top_chord_vol_single:.5f}\\text{{ m}}^3$"
+            quantities["bracing_top_vol_formula"] = f"${top_chord_area:.5f}\\text{{ m}}^2 \\times {spacing:.2f}\\text{{ m}} = {top_chord_vol_single:.5f}\\text{{ m}}^3$"
             quantities["bracing_top_qty"] = str(top_chord_qty)
             quantities["bracing_top_vol_total"] = f"{top_chord_vol_total:.2f}" if top_chord_enabled else "0.00"
             quantities["bracing_top_wt_single"] = f"{top_chord_wt_single:.4f}"
@@ -298,12 +333,12 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
 
             # 5b. Bottom Chord
             bot_chord_qty = (n_girders - 1) * n_panels if bot_chord_enabled else 0
-            bot_chord_vol_single = bracing_area * spacing
+            bot_chord_vol_single = bot_chord_area * spacing
             bot_chord_vol_total = bot_chord_qty * bot_chord_vol_single
-            bot_chord_wt_single = bot_chord_vol_single * 7.85
-            bot_chord_wt_total = bot_chord_vol_total * 7.85
+            bot_chord_wt_single = bot_chord_vol_single * steel_density_mt
+            bot_chord_wt_total = bot_chord_vol_total * steel_density_mt
             
-            quantities["bracing_bot_vol_formula"] = f"${bracing_area:.5f}\\text{{ m}}^2 \\times {spacing:.2f}\\text{{ m}} = {bot_chord_vol_single:.5f}\\text{{ m}}^3$"
+            quantities["bracing_bot_vol_formula"] = f"${bot_chord_area:.5f}\\text{{ m}}^2 \\times {spacing:.2f}\\text{{ m}} = {bot_chord_vol_single:.5f}\\text{{ m}}^3$"
             quantities["bracing_bot_qty"] = str(bot_chord_qty)
             quantities["bracing_bot_vol_total"] = f"{bot_chord_vol_total:.2f}" if bot_chord_enabled else "0.00"
             quantities["bracing_bot_wt_single"] = f"{bot_chord_wt_single:.4f}"
@@ -313,8 +348,8 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
             diags_qty = (n_girders - 1) * n_panels * 2
             diag_vol_single = bracing_area * bracing_len
             diag_vol_total = diags_qty * diag_vol_single
-            diag_wt_single = diag_vol_single * 7.85
-            diag_wt_total = diag_vol_total * 7.85
+            diag_wt_single = diag_vol_single * steel_density_mt
+            diag_wt_total = diag_vol_total * steel_density_mt
             
             quantities["bracing_diag_vol_formula"] = f"${bracing_area:.5f}\\text{{ m}}^2 \\times {bracing_len:.2f}\\text{{ m}} = {diag_vol_single:.5f}\\text{{ m}}^3$"
             quantities["bracing_diag_qty"] = str(diags_qty)
@@ -351,8 +386,8 @@ def calculate_material_quantities(inputs: dict, outputs: dict) -> dict:
             cb_total_vol = 2 * cb_vol
             quantities["crash_barrier_vol_total"] = f"{cb_total_vol:.2f}"
             
-            single_cb_wt = cb_vol * 2.5
-            total_cb_wt = cb_total_vol * 2.5
+            single_cb_wt = cb_vol * concrete_density_mt
+            total_cb_wt = cb_total_vol * concrete_density_mt
             quantities["crash_barrier_wt_single"] = f"{single_cb_wt:.2f}"
             quantities["crash_barrier_wt_total"] = f"{total_cb_wt:.2f}"
         else:

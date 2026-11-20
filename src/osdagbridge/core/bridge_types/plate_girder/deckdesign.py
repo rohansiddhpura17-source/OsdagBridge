@@ -847,7 +847,7 @@ def design_deck_slab(input_dict: dict, fck: float, fctm: float, fy: float, Es: f
     # design_results (computed in Stage 5).
     if has_composite:
         def _ur(demand, capacity):
-            return round(demand / capacity, 4) if capacity else 0.0
+            return round(demand / capacity, 4) if capacity > 0 else (9.999 if demand > 0 else 0.0)
         ur_composite_trans_shear  = _ur(ts["VL_N_per_mm"], ts["governing_capacity_kN_per_m"])
         ur_composite_crack        = _ur(crack["As_min_mm2"], crack["As_provided_mm2"])
         ur_composite_conc_stress  = _ur(dr.get("sigma_c_actual_MPa") or 0.0,

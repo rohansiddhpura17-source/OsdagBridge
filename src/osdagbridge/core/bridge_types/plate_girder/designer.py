@@ -1317,7 +1317,7 @@ class IRC22CapacityCalculator:
             "f_fd_MPa": f_fd,
             "tau_fd_MPa": tau_fd,
             "f_fd_eff_MPa": min(f_fd, 1.5 * mat.fy),
-            "tau_fd_eff_MPa": min(tau_fd, 1.5 * 0.43 * mat.fy),
+            "tau_fd_eff_MPa": min(tau_fd, assessment["tau_y_limit_MPa"]),
             "Nsc": fat.Nsc,
             "exempt_stress_check": design["stress_condition_ok"],
             "clause": "IRC 22:2015 - Cl.605.2 / 605.3 / 605.4",

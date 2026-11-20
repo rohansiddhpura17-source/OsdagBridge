@@ -976,10 +976,16 @@ class BridgeInputValidator:
             return False, "Please select a location on the map or enter latitude and longitude."
 
         try:
-            float(lat)
-            float(lon)
+            lat_val = float(lat)
+            lon_val = float(lon)
         except ValueError:
             return False, "Please enter valid numeric latitude and longitude values."
+
+        if not (isfinite(lat_val) and isfinite(lon_val)):
+            return False, "Latitude and longitude must be finite numbers."
+
+        if not (-90.0 <= lat_val <= 90.0 and -180.0 <= lon_val <= 180.0):
+            return False, "Latitude must be between -90 and 90, and longitude between -180 and 180."
 
         return True, ""
 

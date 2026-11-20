@@ -350,7 +350,7 @@ class IRC22_2014:
         # The branch mirrors IS800_2007.Table2_i's own comparison ('Rolled')
         # so the returned limit always matches the class it produced.
         eps = math.sqrt(250.0 / fy_MPa)
-        if section_type == 'Rolled':
+        if str(section_type).strip().lower() == 'rolled':
             limits = {"Plastic": 9.4 * eps, "Compact": 10.5 * eps,
                       "Semi-Compact": 15.7 * eps, "Slender": 15.7 * eps}
         else:
