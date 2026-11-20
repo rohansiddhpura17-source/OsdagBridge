@@ -1,0 +1,2255 @@
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/analyser.py b/src/osdagbridge/core/bridge_types/plate_girder/analyser.py
+index e1a6e63..413518b 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/analyser.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/analyser.py
+@@ -1,4 +1,5 @@
+ import ospgrillage as og
++from ospgrillage.load import ThermalElementLoad
+ import xarray as xr
+ # from math import sqrt, pi
+ # import openseespy.opensees as ops
+@@ -148,7 +149,8 @@ class BridgeGrillageModel:
+                         girder_sections: list[SectionProperties],
+                         edge_longitudinal: SectionProperties,
+                         transverse: SectionProperties,
+-                        end_transverse: SectionProperties):
++                        end_transverse: SectionProperties,
++                        steel_girder_sections: list[SectionProperties] | None = None):
+         """
+         Creates all grillage sections from user-supplied SectionProperties.
+ 
+@@ -163,12 +165,20 @@ class BridgeGrillageModel:
+             Properties for the transverse slab (unit_width=True).
+         end_transverse : SectionProperties
+             Properties for the end transverse slab.
++        steel_girder_sections : list[SectionProperties], optional
++            Bare-steel girder sections used for girder self-weight calculation
++            when ``girder_sections`` carries transformed composite properties.
+         """
+         if not girder_sections:
+             raise ValueError("create_sections requires at least one girder section.")
+ 
+         # Per-girder DTOs and ospgrillage sections.
+         self.girder_props = list(girder_sections)
++        self.steel_girder_props = (
++            list(steel_girder_sections)
++            if steel_girder_sections is not None
++            else list(girder_sections)
++        )
+         self.girder_sections = [
+             og.create_section(A=s.A, J=s.J, Iz=s.Iz, Iy=s.Iy, Az=s.Az, Ay=s.Ay)
+             for s in girder_sections
+@@ -253,7 +263,13 @@ class BridgeGrillageModel:
+     # ============================================================
+     #   CREATE THE GRILLAGE MODEL
+     # ============================================================
+-    def create_model(self):
++    def create_model(
++        self,
++        left_support: str = "Pinned",
++        right_support: str = "Roller",
++        k_left_kN_m: float | None = None,
++        k_right_kN_m: float | None = None,
++    ):
+ 
+         # -------------------------------------------------
+         # Load placement manager
+@@ -280,6 +296,29 @@ class BridgeGrillageModel:
+             mesh_type="Oblique"  # ('Ortho' or 'Oblique')
+         )
+ 
++        # Explicit support & bearing boundary mapping per bridge support selections
++        restraint_map = {
++            "Pinned": [1, 1, 1, 0, 0, 0],
++            "Roller": [0, 1, 1, 0, 0, 0],
++            "Fixed":  [1, 1, 1, 1, 1, 1],
++        }
++        left_vec = restraint_map.get(str(left_support).strip(), [1, 1, 1, 0, 0, 0])
++        right_vec = restraint_map.get(str(right_support).strip(), [0, 1, 1, 0, 0, 0])
++        self.model.set_boundary_condition(edge_group_counter=0, new_restraint_vector=left_vec)
++        self.model.set_boundary_condition(edge_group_counter=1, new_restraint_vector=right_vec)
++        if k_left_kN_m is not None:
++            self.model.set_longitudinal_spring_support(
++                stiffness_N_per_m=float(k_left_kN_m) * 1000.0,
++                edge_num=0,
++                base_restraint=left_vec,
++            )
++        if k_right_kN_m is not None:
++            self.model.set_longitudinal_spring_support(
++                stiffness_N_per_m=float(k_right_kN_m) * 1000.0,
++                edge_num=1,
++                base_restraint=right_vec,
++            )
++
+         # Assign members — one section per main girder.
+         self._assign_girder_members()
+ 
+@@ -391,8 +430,10 @@ class BridgeGrillageModel:
+         start_beam = 0
+         end_beam = L
+ 
+-        # Per-girder areas ordered by ascending transverse (z) position.
+-        girder_areas = [p.A for p in self.girder_props]
++        # Per-girder bare-steel areas ordered by ascending transverse (z) position
++        # so girder self-weight never double-counts concrete deck stiffness.
++        sw_props = getattr(self, "steel_girder_props", None) or self.girder_props
++        girder_areas = [p.A for p in sw_props]
+ 
+         # Ordered transverse positions of the main girders (ascending z); used to
+         # map each loaded grid line back to its girder index.
+@@ -908,72 +949,160 @@ class BridgeGrillageModel:
+             temperature_load_kN_m2: float | None = None,
+             partial_safety_factor: float = 1.0,
+     ):
+-        """
+-        Creates a uniform temperature load as a patch load over the full bridge
+-        deck footprint (same extents as the deck slab load).
++        """Reject legacy vertical pressure substitute for thermal actions (Issue #92).
+ 
+-        The load represents the equivalent transverse effect of a temperature
+-        differential on the bridge superstructure per IRC:6-2017 Cl.215.
+-
+-        Parameters
+-        ----------
+-        temperature_load_kN_m2 : float
+-            Temperature load intensity in kN/m² (required).
+-        partial_safety_factor : float
+-            Partial safety factor applied to the ``"{psf} TL"`` load case.
+-            Default is 1.0.
++        Use :meth:`create_thermal_load_cases` with validated IRC:6 Cl. 215
++        thermal eigenstrain inputs instead of applying a pressure load.
++        """
++        if temperature_load_kN_m2 is not None and float(temperature_load_kN_m2) != 0.0:
++            raise ValueError(
++                "create_temperature_load(): 'temperature_load_kN_m2' represents a "
++                "vertical deck patch pressure, not thermal expansion/gradient strain. "
++                "Use canonical KEY_TL_* thermal inputs instead."
++            )
++        raise ValueError(
++            "create_temperature_load() is deprecated; call create_thermal_load_cases() "
++            "with canonical thermal eigenstrain parameters."
++        )
+ 
+-        The created load case is stored on ``self.temperature_load_case``.
++    def create_thermal_load_cases(
++        self,
++        thermal_spec: dict,
++        girder_layers_list: list[list[dict]],
++        E_s_Pa: float,
++        t_slab_m: float,
++        model=None,
++    ) -> dict:
++        """Create and register native OpenSeesPy equivalent-nodal thermal load cases.
++
++        Builds:
++          - ``TL_UNIFORM_RISE`` : uniform bridge temperature rise (+delta_T_rise)
++          - ``TL_UNIFORM_FALL`` : uniform bridge temperature fall (-delta_T_fall)
++          - ``TL_GRADIENT_HEAT`` (when gradient enabled and deck slab > 0)
++          - ``TL_GRADIENT_COOL`` (when gradient enabled and deck slab > 0)
++          - ``1.0 TL``           : governing positive thermal case (rise + gradient heat)
++                                   stored on ``self.temperature_load_case`` for IRC:6
++                                   Table B.2/B.3 ULS/SLS combinations.
+         """
++        from osdagbridge.core.bridge_types.plate_girder.thermal_analysis import (
++            build_thermal_element_load,
++            compute_composite_thermal_section,
++        )
++
+         model = model or self.model
+         if model is None:
+-            raise ValueError("Model is not available. Create model before adding loads.")
++            raise ValueError("Model is not available. Create model before adding thermal loads.")
+ 
+-        if temperature_load_kN_m2 is None:
+-            raise ValueError(
+-                "create_temperature_load requires temperature_load_kN_m2 (in kN/m²) "
+-                "so the patch load magnitude can be set."
++        zg = model.common_grillage_element_z_group
++        long_cats = (
++            "edge_beam", "exterior_main_beam_1",
++            "interior_main_beam", "exterior_main_beam_2",
++        )
++        all_long_groups = sorted({g for cat in long_cats for g in zg.get(cat, [])})
++        main_groups = all_long_groups[1:-1] if self.edge_dist > 0 else all_long_groups
++
++        def _member_for_group(g: int) -> str:
++            for cat in (
++                "exterior_main_beam_1", "exterior_main_beam_2",
++                "interior_main_beam", "edge_beam",
++            ):
++                if g in zg.get(cat, []):
++                    return cat
++            raise ValueError(f"z_group {g} not found in longitudinal categories")
++
++        girder_elements: list[list[int]] = []
++        for g in main_groups:
++            cat = _member_for_group(g)
++            z_idx = zg[cat].index(g)
++            eles = model.get_element(member=cat, options="elements", z_group_num=z_idx)
++            girder_elements.append([int(e) for e in eles])
++
++        n_girders = len(girder_elements)
++        dT_rise = float(thermal_spec["delta_T_rise_C"])
++        dT_fall = float(thermal_spec["delta_T_fall_C"])
++        include_grad = bool(thermal_spec.get("include_gradient", True)) and float(t_slab_m) > 0.0
++
++        gr_heat = (
++            IRC6_2017.cl_215_4_temperature_gradient(float(t_slab_m), gradient_type="heating")
++            if include_grad else None
++        )
++        gr_cool = (
++            IRC6_2017.cl_215_4_temperature_gradient(float(t_slab_m), gradient_type="cooling")
++            if include_grad else None
++        )
++
++        def _layers_for(idx: int) -> list[dict]:
++            return girder_layers_list[idx] if idx < len(girder_layers_list) else girder_layers_list[-1]
++
++        def _assemble_case(case_name: str, dT_fn) -> tuple[ThermalElementLoad, list[dict]]:
++            per_ele_strains: dict[int, tuple[float, float]] = {}
++            per_girder_props: list[dict] = []
++            for gi in range(n_girders):
++                sec = compute_composite_thermal_section(
++                    layers=_layers_for(gi),
++                    E_ref_Pa=float(E_s_Pa),
++                    dT_fn=dT_fn,
++                )
++                per_girder_props.append(sec)
++                strain_pair = (sec["free_axial_strain"], sec["free_curvature_per_m"])
++                for eid in girder_elements[gi]:
++                    per_ele_strains[eid] = strain_pair
++            load_obj = build_thermal_element_load(
++                model=model,
++                name=case_name,
++                per_element_strains=per_ele_strains,
++                metadata={"case_name": case_name},
+             )
++            return load_obj, per_girder_props
+ 
+-        tl_mag = temperature_load_kN_m2 * kN / m**2  # N/m²
+-        print(f"Temperature load magnitude: {tl_mag:.2f} N/m²")
++        created_cases = {}
++        section_summaries = {}
+ 
+-        # -------------------------------------------------
+-        # Get geometry from load manager (full deck footprint)
+-        # -------------------------------------------------
+-        geom = self.load_manager.deck_load()
++        def _register_single(lc_name: str, load_obj) -> None:
++            lc = og.create_load_case(name=lc_name)
++            lc.add_load(load_obj)
++            model.add_load_case(lc)
++            created_cases[lc_name] = lc
+ 
+-        # -------------------------------------------------
+-        # Convert geometry → ospgrillage vertices
+-        # -------------------------------------------------
+-        p1 = og.create_load_vertex(x=geom.p1.x, z=geom.p1.z, p=tl_mag)
+-        p2 = og.create_load_vertex(x=geom.p2.x, z=geom.p2.z, p=tl_mag)
+-        p3 = og.create_load_vertex(x=geom.p3.x, z=geom.p3.z, p=tl_mag)
+-        p4 = og.create_load_vertex(x=geom.p4.x, z=geom.p4.z, p=tl_mag)
++        rise_load, rise_props = _assemble_case("TL_UNIFORM_RISE", lambda y, D: dT_rise)
++        _register_single("TL_UNIFORM_RISE", rise_load)
++        section_summaries["TL_UNIFORM_RISE"] = rise_props
+ 
+-        # -------------------------------------------------
+-        # Create patch load
+-        # -------------------------------------------------
+-        temp_load = og.create_load(
+-            loadtype="patch",
+-            name="temperature load",
+-            point1=p1,
+-            point2=p2,
+-            point3=p3,
+-            point4=p4,
+-        )
++        fall_load, fall_props = _assemble_case("TL_UNIFORM_FALL", lambda y, D: -dT_fall)
++        _register_single("TL_UNIFORM_FALL", fall_load)
++        section_summaries["TL_UNIFORM_FALL"] = fall_props
+ 
+-        # -------------------------------------------------
+-        # Create & register load case
+-        # -------------------------------------------------
+-        TL = og.create_load_case(name=f"{partial_safety_factor} TL")
+-        TL.add_load(temp_load)
+-        model.add_load_case(TL, load_factor=partial_safety_factor)
++        if include_grad and gr_heat is not None and gr_cool is not None:
++            heat_fn = lambda y, D: float(gr_heat["T_at_y"](max(0.0, D - y)))
++            cool_fn = lambda y, D: -float(gr_cool["T_at_y"](max(0.0, D - y)))
++            gh_load, gh_props = _assemble_case("TL_GRADIENT_HEAT", heat_fn)
++            _register_single("TL_GRADIENT_HEAT", gh_load)
++            section_summaries["TL_GRADIENT_HEAT"] = gh_props
+ 
+-        # store reference
+-        self.temperature_load_case = TL
++            gc_load, gc_props = _assemble_case("TL_GRADIENT_COOL", cool_fn)
++            _register_single("TL_GRADIENT_COOL", gc_load)
++            section_summaries["TL_GRADIENT_COOL"] = gc_props
++
++            gov_fn = lambda y, D: dT_rise + float(gr_heat["T_at_y"](max(0.0, D - y)))
++            gov_load, gov_props = _assemble_case("1.0 TL", gov_fn)
++        else:
++            gov_load, gov_props = _assemble_case("1.0 TL", lambda y, D: dT_rise)
+ 
+-        return TL
++        TL = og.create_load_case(name="1.0 TL")
++        TL.add_load(gov_load)
++        model.add_load_case(TL, load_factor=1.0)
++        created_cases["1.0 TL"] = TL
++        section_summaries["1.0 TL"] = gov_props
++
++        self.temperature_load_case = TL
++        self.thermal_load_cases = created_cases
++        self.thermal_section_summaries = section_summaries
++        return {
++            "load_cases": list(created_cases.keys()),
++            "section_summaries": section_summaries,
++            "gradient_heat_T1_C": gr_heat["T1"] if gr_heat else 0.0,
++            "gradient_cool_T1_C": gr_cool["T1"] if gr_cool else 0.0,
++        }
+ 
+     # ============================================================
+     #   Seismic / Earthquake Load
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py b/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
+index a9392ef..97c06d9 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
+@@ -225,6 +225,7 @@ class PlateGirderAnalysisResults:
+         envelope_uls      = []
+         envelope_sls      = []
+         dl_ll_cases       = []
++        thermal_loads     = []
+ 
+         for lc in all_lc:
+             name       = str(lc)
+@@ -272,6 +273,11 @@ class PlateGirderAnalysisResults:
+                 vehicle_static.append(lc)
+                 continue
+ 
++            # Thermal load cases (IRC:6-2017 Cl. 215 uniform & gradient)
++            if name.startswith("TL_") or name == "1.0 TL" or name.endswith(" TL") or name == "TL":
++                thermal_loads.append(lc)
++                continue
++
+             # Self-weight individual case
+             if name == "SW":
+                 sw_cases.append(lc)
+@@ -284,6 +290,7 @@ class PlateGirderAnalysisResults:
+         return {
+             "all":                  all_lc,
+             "dead":                 dead_loads,
++            "thermal":              thermal_loads,
+             "vehicle_static":       vehicle_static,
+             "vehicle_moving":       [],          # moving load cases removed from analyser
+             "sw":                   sw_cases,
+@@ -341,14 +348,22 @@ class PlateGirderAnalysisResults:
+     # GRILLAGE CONNECTIVITY
+     # ========================================================
+     def build_grillage_connectivity(self):  # connectivity between nodes[raph for bfs]
+-
++        ground_nodes = (
++            set(getattr(self.model, "longitudinal_spring_node_pairs", {}).keys())
++            | set(getattr(self.model, "spring_node_pairs", {}).keys())
++        )
+         nodes = {}
+         for n in ops.getNodeTags():
++            if n in ground_nodes:
++                continue
+             nodes[n] = ops.nodeCoord(n)
+ 
+         elements = {}
+         for e in ops.getEleTags():
+-            elements[e] = ops.eleNodes(e)
++            conn = ops.eleNodes(e)
++            if any(nid in ground_nodes for nid in conn):
++                continue
++            elements[e] = conn
+ 
+         adj = defaultdict(set)
+ 
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/designer.py b/src/osdagbridge/core/bridge_types/plate_girder/designer.py
+index 97ef68a..27f0846 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/designer.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/designer.py
+@@ -2889,7 +2889,11 @@ def _extract_demands_from_analysis_results(
+         A_steel_mm2=sec.A_steel, Iz_steel_mm4=sec.Iz_steel,
+         y_cg_from_bot_mm=sec.y_cg_from_bot, D_steel_mm=sec.D, n=mod["m_short_term"],
+     )
+-    stiffness_ratio = max(props[KEY_COMP_I] / sec.Iz_steel, 1.0)
++    if getattr(getattr(analysis_results, "bridge", None), "uses_composite_girder_sections", False):
++        # Grillage longitudinal members already use composite transformed (A_eq, Iz_eq).
++        stiffness_ratio = 1.0
++    else:
++        stiffness_ratio = max(props[KEY_COMP_I] / sec.Iz_steel, 1.0)
+ 
+ 
+     Ze_steel_mm3 = float(config.section.Ze_steel)
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py b/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
+index 49cb4e1..d994f54 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
+@@ -35,6 +35,13 @@ from .plot_generator import (
+     figure_to_bytes,
+ )
+ from osdagbridge.core.utils.codes.irc6_2017 import IRC6_2017
++from osdagbridge.core.utils.codes.irc22_2015 import IRC22_2014
++from .thermal_analysis import (
++    parse_support_conditions,
++    parse_and_validate_thermal_inputs,
++    build_composite_section_layers,
++    compute_composite_thermal_section,
++)
+ from osdagbridge.core.utils.common import (
+     KEY_STRUCTURE_TYPE,
+     KEY_PROJECT_LOCATION,
+@@ -229,6 +236,10 @@ from osdagbridge.core.utils.common import (
+     KEY_MP_STIFFENER_INTERMEDIATE_OUTSTAND,
+     KEY_MP_STIFFENER_INTERMEDIATE_SPACING,
+     KEY_MP_STIFFENER_LONGITUDINAL,
++    KEY_TL_BRIDGE_TEMP_MIN,
++    KEY_TL_BRIDGE_TEMP_MAX,
++    KEY_TL_TEMP_RISE,
++    KEY_TL_TEMP_FALL,
+ 
+     # Cross Bracing Details
+     KEY_MP_CB_BRACING_SECTION_TYPE,
+@@ -636,6 +647,9 @@ class PlateGirderBridge:
+         if spacing <= 0:
+             raise ValueError(f"Girder spacing must be positive, got {spacing}.")
+ 
++        parse_support_conditions(inp)
++        parse_and_validate_thermal_inputs(inp)
++
+     def _solve_bridge_layout(self):
+         """Snapshot input_dict into mutable output_dict for the pipeline."""
+         self.output_dict = dict(self.input_dict)
+@@ -730,6 +744,7 @@ class PlateGirderBridge:
+             dataset = self._run_stage("4G", self._reanalyze_with_dedup)
+             dataset = self.create_envelope_load_case(dataset)
+             dataset = self._drop_moving_increment_cases(dataset)
++            self._populate_thermal_solver_summary(dataset)
+ 
+             # Drop the raw ospgrillage per-load-case records as soon as the
+             # deduplicated dataset is cached: everything downstream (design checks,
+@@ -1123,21 +1138,115 @@ class PlateGirderBridge:
+         deck_layout, and section_props.
+         """
+         self.grillage_model.set_geometry(self.grillage_geometry, self.deck_layout)
+-        # Build one SectionProperties per main girder. When the input dict carries
+-        # per-girder dynamic keys (``<base>.G{i}.M1``) the girders may differ;
+-        # otherwise every girder falls back to the shared scalar section.
++        # Clear any stale thermal state from prior runs on this instance.
++        self.grillage_model.temperature_load_case = None
++        self.grillage_model.thermal_load_cases = {}
++        self.grillage_model.thermal_section_summaries = {}
++        self.thermal_results = None
++        self._thermal_girder_layers = None
++
++        supports = parse_support_conditions(self.input_dict)
++        self._thermal_spec = parse_and_validate_thermal_inputs(self.input_dict)
++        self.material_props = self._build_material_props()
++
++        # Build one SectionProperties per main girder. When canonical thermal
++        # inputs are active, transform girder (A, Iz) to the steel-referenced
++        # composite section so OpenSees longitudinal thermal & mechanical
++        # stiffness matches IRC:6-2017 Cl. 215. When thermal inputs are absent,
++        # keep exact pre-thermal bare-steel girder sections for invariance.
+         n_girders = self._girder_count()
+-        girder_sections = [self._girder_section(i) for i in range(n_girders)]
++        base_girder_sections = [self._girder_section(i) for i in range(n_girders)]
++        girder_sections = list(base_girder_sections)
++        if self._thermal_spec is not None:
++            layers_list, E_s_Pa, t_slab_m = self._build_thermal_girder_layers(self._thermal_spec)
++            comp_sections = []
++            for gi, sec in enumerate(base_girder_sections):
++                comp = compute_composite_thermal_section(
++                    layers=layers_list[gi],
++                    E_ref_Pa=E_s_Pa,
++                    dT_fn=lambda y, D: 0.0,
++                )
++                comp_sections.append(
++                    SectionProperties(
++                        A=comp["A_eq_steel_m2"],
++                        J=sec.J,
++                        Iz=comp["Iz_eq_steel_m4"],
++                        Iy=sec.Iy,
++                        Az=sec.Az,
++                        Ay=sec.Ay,
++                    )
++                )
++            girder_sections = comp_sections
++            self._thermal_girder_layers = layers_list
++            self._thermal_E_s_Pa = E_s_Pa
++            self._thermal_t_slab_m = t_slab_m
++            self.grillage_model.uses_composite_girder_sections = True
++        else:
++            self.grillage_model.uses_composite_girder_sections = False
++
+         self.grillage_model.create_sections(
+             girder_sections=girder_sections,
+             edge_longitudinal=self._girder_section(),
+             transverse=self._transverse_section(),
+             end_transverse=self._end_transverse_section(),
++            steel_girder_sections=base_girder_sections,
+         )
+-        self.material_props = self._build_material_props()
+         self.grillage_model.create_material(self.material_props)
+         self.grillage_model.assign_members()
+-        self.grillage_model.create_model()
++        self.grillage_model.create_model(
++            left_support=supports["left_support"],
++            right_support=supports["right_support"],
++            k_left_kN_m=supports["k_left_kN_m"],
++            k_right_kN_m=supports["k_right_kN_m"],
++        )
++
++    def _build_thermal_girder_layers(
++        self, thermal_spec: dict
++    ) -> tuple[list[list[dict]], float, float]:
++        """Build bottom-to-top composite section layers per main girder."""
++        if getattr(self, "material_props", None) is None:
++            self.material_props = self._build_material_props()
++        E_s_Pa = float(self.material_props.steel_prop.E)
++        E_c_Pa = float(self.material_props.concrete_prop.Ecm) * GPa
++        t_slab_m = float(
++            deck_thickness_from_inputs(self.input_dict, _DEFAULT_DECK_THICKNESS_MM)
++        )
++        L_m = float(self.input_dict[KEY_SPAN])
++        B_m = float(self.input_dict[KEY_TS_GIRDER_SPACING])
++        edge_m = float(self.input_dict.get(KEY_TS_DECK_OVERHANG, 0.0) or 0.0)
++        n_girders = self._girder_count()
++
++        layers_list: list[list[dict]] = []
++        for gi in range(n_girders):
++            if gi in (0, n_girders - 1):
++                eff = IRC22_2014.cl_603_2_1_effective_width_simply_supported(
++                    Lo=L_m, beam_type="outer", B1=B_m, B0=edge_m
++                )
++            else:
++                eff = IRC22_2014.cl_603_2_1_effective_width_simply_supported(
++                    Lo=L_m, beam_type="inner", B=B_m
++                )
++            b_eff_m = float(eff["beff_m"])
++            steel_dims = {
++                "tf_bot_m": float(self._girder_value(KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS, gi)),
++                "bf_bot_m": float(self._girder_value(KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH, gi)),
++                "dw_m":     float(self._girder_value(KEY_MP_GIRDER_WEB_DEPTH, gi)),
++                "tw_m":     float(self._girder_value(KEY_MP_GIRDER_WEB_THICKNESS, gi)),
++                "tf_top_m": float(self._girder_value(KEY_MP_GIRDER_TOP_FLANGE_THICKNESS, gi)),
++                "bf_top_m": float(self._girder_value(KEY_MP_GIRDER_TOP_FLANGE_WIDTH, gi)),
++            }
++            layers_list.append(
++                build_composite_section_layers(
++                    steel_dims=steel_dims,
++                    b_eff_m=b_eff_m,
++                    t_slab_m=t_slab_m,
++                    E_s_Pa=E_s_Pa,
++                    E_c_Pa=E_c_Pa,
++                    alpha_steel=float(thermal_spec["alpha_steel_per_C"]),
++                    alpha_rcc=float(thermal_spec["alpha_rcc_per_C"]),
++                )
++            )
++        return layers_list, E_s_Pa, t_slab_m
+ 
+     def _lookup_material(self, material_name: str, property: str) -> float:
+         """
+@@ -1893,24 +2002,128 @@ class PlateGirderBridge:
+ 
+     def add_temperature_load(self) -> None:
+         """
+-        Apply temperature load to the grillage model as a patch load over the
+-        full deck footprint per IRC:6-2017 Cl.215.
+-
+-        The load intensity is read from ``self.additional_inputs`` using the key
+-        ``"temperature_load_kN_m2"``.  If the key is absent or zero the load is
+-        silently skipped (temperature load is optional).
+-
+-        Delegates to BridgeGrillageModel.create_temperature_load().
++        Apply IRC:6-2017 Cl. 215 uniform & gradient thermal eigenstrain actions
++        via ``BridgeGrillageModel.create_thermal_load_cases()``.
++
++        Canonical ``KEY_TL_*`` inputs activate first-class thermal cases
++        (``TL_UNIFORM_RISE``, ``TL_UNIFORM_FALL``, ``TL_GRADIENT_HEAT``,
++        ``TL_GRADIENT_COOL``, and governing ``1.0 TL``). Legacy
++        ``temperature_load_kN_m2`` is explicitly rejected by
++        ``parse_and_validate_thermal_inputs()``. When no canonical thermal
++        inputs are configured, skips cleanly to preserve nonthermal invariance.
+         """
+-        tl_raw = self.input_dict.get("temperature_load_kN_m2")
+-        if not tl_raw or float(tl_raw) == 0.0:
++        spec = getattr(self, "_thermal_spec", None)
++        if spec is None:
++            spec = parse_and_validate_thermal_inputs(self.input_dict)
++        if spec is None:
+             bridge_logger.info("Temperature load absent; skipping.")
+             return
+-        tl_kN_m2 = float(tl_raw)
+-        self.grillage_model.create_temperature_load(
+-            temperature_load_kN_m2=tl_kN_m2,
+-            partial_safety_factor=1.0,
++        self._thermal_spec = spec
++
++        if getattr(self, "_thermal_girder_layers", None) is None:
++            layers_list, E_s_Pa, t_slab_m = self._build_thermal_girder_layers(spec)
++            self._thermal_girder_layers = layers_list
++            self._thermal_E_s_Pa = E_s_Pa
++            self._thermal_t_slab_m = t_slab_m
++
++        summary = self.grillage_model.create_thermal_load_cases(
++            thermal_spec=spec,
++            girder_layers_list=self._thermal_girder_layers,
++            E_s_Pa=self._thermal_E_s_Pa,
++            t_slab_m=self._thermal_t_slab_m,
++        )
++        self.thermal_results = {"spec": spec, **summary}
++
++        if isinstance(getattr(self, "output_dict", None), dict):
++            self.output_dict[KEY_TL_BRIDGE_TEMP_MIN] = f"{float(spec['T_e_min_C']):.2f}"
++            self.output_dict[KEY_TL_BRIDGE_TEMP_MAX] = f"{float(spec['T_e_max_C']):.2f}"
++            self.output_dict[KEY_TL_TEMP_RISE] = f"{float(spec['delta_T_rise_C']):.2f}"
++            self.output_dict[KEY_TL_TEMP_FALL] = f"{float(spec['delta_T_fall_C']):.2f}"
++            self.output_dict["thermal_analysis"] = self.thermal_results
++
++    def _populate_thermal_solver_summary(self, dataset) -> None:
++        """Populate solved displacements, girder forces & reactions per thermal case."""
++        if (
++            dataset is None
++            or getattr(self, "_thermal_spec", None) is None
++            or not isinstance(getattr(self, "output_dict", None), dict)
++            or "thermal_analysis" not in self.output_dict
++        ):
++            return
++        import numpy as np
++
++        rh = PlateGirderAnalysisResults(
++            dataset=dataset,
++            bridge=self.grillage_model,
++            edge_dist=self.get_edge_dist(),
+         )
++        g_map, _ = rh.build_girders(verbose=False)
++        girder_nodes = sorted({
++            int(n)
++            for gk, gv in g_map.items()
++            if not gk.startswith("EB")
++            for n in gv.get("path", [])
++        })
++        girder_eles = sorted({
++            int(e)
++            for gk, gv in g_map.items()
++            if not gk.startswith("EB")
++            for e in gv.get("elements", [])
++        })
++        if not girder_nodes or not girder_eles:
++            return
++
++        avail_lcs = {str(lc) for lc in dataset.coords["Loadcase"].values}
++        disp_nodes = [n for n in girder_nodes if n in set(int(x) for x in dataset["displacements"].coords["Node"].values)]
++        force_eles = [e for e in girder_eles if e in set(int(x) for x in dataset["forces"].coords["Element"].values)]
++        has_rxn = "reactions" in dataset.data_vars
++
++        def _signed_extreme(arr: np.ndarray) -> float:
++            flat = np.nan_to_num(np.asarray(arr, dtype=float).ravel(), nan=0.0)
++            if flat.size == 0:
++                return 0.0
++            idx = int(np.argmax(np.abs(flat)))
++            return float(flat[idx])
++
++        solver_summary: dict[str, dict] = {}
++        for lc_name in self.output_dict["thermal_analysis"].get("load_cases", []):
++            if lc_name not in avail_lcs:
++                continue
++            disp_lc = dataset["displacements"].sel(Loadcase=lc_name, Node=disp_nodes)
++            dx_m = _signed_extreme(disp_lc.sel(Component="x").values)
++            dy_m = _signed_extreme(disp_lc.sel(Component="y").values)
++
++            f_lc = dataset["forces"].sel(Loadcase=lc_name, Element=force_eles)
++            n_n = _signed_extreme(f_lc.sel(Component=["Vx_i", "Vx_j"]).values)
++            mz_nm = _signed_extreme(f_lc.sel(Component=["Mz_i", "Mz_j"]).values)
++
++            entry = {
++                "dx_max_mm": round(dx_m * 1000.0, 6),
++                "dy_mid_max_mm": round(dy_m * 1000.0, 6),
++                "N_max_kN": round(n_n / 1000.0, 6),
++                "Mz_max_kNm": round(mz_nm / 1000.0, 6),
++                "Rx_sum_kN": 0.0,
++                "Ry_sum_kN": 0.0,
++                "Rx_abs_max_node_kN": 0.0,
++                "rx_equilibrium_residual_kN": 0.0,
++                "ry_equilibrium_residual_kN": 0.0,
++            }
++            if has_rxn:
++                rxn_lc = dataset["reactions"].sel(Loadcase=lc_name)
++                fx_kn = np.nan_to_num(np.asarray(rxn_lc.sel(ReactionComponent="Fx").values, dtype=float), nan=0.0) / 1000.0
++                fy_kn = np.nan_to_num(np.asarray(rxn_lc.sel(ReactionComponent="Fy").values, dtype=float), nan=0.0) / 1000.0
++                rx_sum = float(np.sum(fx_kn))
++                ry_sum = float(np.sum(fy_kn))
++                entry["Rx_sum_kN"] = round(rx_sum, 6)
++                entry["Ry_sum_kN"] = round(ry_sum, 6)
++                entry["Rx_abs_max_node_kN"] = round(float(np.max(np.abs(fx_kn))) if fx_kn.size else 0.0, 6)
++                entry["rx_equilibrium_residual_kN"] = round(abs(rx_sum), 8)
++                entry["ry_equilibrium_residual_kN"] = round(abs(ry_sum), 8)
++            solver_summary[lc_name] = entry
++
++        self.output_dict["thermal_analysis"]["solver_summary"] = solver_summary
++        if isinstance(getattr(self, "thermal_results", None), dict):
++            self.thermal_results["solver_summary"] = solver_summary
+ 
+     def add_seismic_loads(self) -> None:
+         """
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/results_data.py b/src/osdagbridge/core/bridge_types/plate_girder/results_data.py
+index b4ea14b..a91f5c1 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/results_data.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/results_data.py
+@@ -480,7 +480,8 @@ def _build_full_data(model, edge_dist: float = 0.0, dataset=None, lazy: bool = F
+         if "reactions" in ds.data_vars:
+             arr  = ds["reactions"].values
+             nids = ds["reactions"].coords["Node"].values
+-            cids = [str(c) for c in ds["reactions"].coords["Component"].values]
++            _rdim = "ReactionComponent" if "ReactionComponent" in ds["reactions"].coords else "Component"
++            cids = [str(c) for c in ds["reactions"].coords[_rdim].values]
+             data["reactions"][str_lc] = {
+                 str(int(n)): dict(zip(cids, row.tolist()))
+                 for n, row in zip(nids, arr)
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/thermal_analysis.py b/src/osdagbridge/core/bridge_types/plate_girder/thermal_analysis.py
+new file mode 100644
+index 0000000..8a9ad5a
+--- /dev/null
++++ b/src/osdagbridge/core/bridge_types/plate_girder/thermal_analysis.py
+@@ -0,0 +1,624 @@
++"""First-class OpenSeesPy thermal mechanics & IRC:6-2017 Clause 215 integration.
++
++Implements physically consistent thermal loading for single-span composite
++plate-girder bridges using:
++  1. Equivalent nodal fixed-end thermal actions assembled from each OpenSeesPy
++     beam element's exact local 12-DOF Euler-Bernoulli stiffness matrix and
++     ``geomTransf`` orientation axes.
++  2. True composite steel-concrete section transformation and vertical layer
++     integration for both uniform temperature (including distinct steel vs RCC
++     thermal expansion coefficients) and IRC:6-2017 Cl. 215.4 gradients.
++  3. Explicit support boundary mapping and optional finite longitudinal bearing
++     spring restraints (``zeroLength`` + ``equalDOF``).
++  4. Exact element-local internal-force recovery ``K_local q_local - f_th,local``
++     via ``ThermalElementLoad`` inside ``ospgrillage``.
++
++Standards basis:
++  - IRC:6-2017 Clause 215 (incorporating Amendment No. 6, May 2021):
++    uniform effective bridge temperature bounds (Cl. 215.2 / Table 15),
++    non-linear heating/cooling temperature gradients (Cl. 215.4), and
++    thermal expansion coefficient ``12.0e-6 /degC`` default when omitted.
++  - IRC:6-2017 Amendment No. 8 (Annex B, Tables B.2 & B.3): ULS and SLS
++    partial safety / combination factors for thermal load ``TL``.
++  - IRC:6-2017 Amendment No. 10 (Notification No. 83): distinction between
++    rigid structural restraint and bearing stiffness/frictional restraint.
++  - IRC:24-2010 Cl. 504.8: grillage skew limit ``|skew| <= 15 deg``.
++"""
++from __future__ import annotations
++
++import ast
++import math
++import re
++from typing import Callable
++
++import numpy as np
++import openseespy.opensees as ops
++
++from ospgrillage.load import ThermalElementLoad
++from osdagbridge.core.utils.codes.irc6_2017 import IRC6_2017
++from osdagbridge.core.utils.common import (
++    KEY_SC_LEFT_SUPPORT,
++    KEY_SC_RIGHT_SUPPORT,
++    KEY_SKEW_ANGLE,
++    KEY_TL_BRIDGE_TEMP_MAX,
++    KEY_TL_BRIDGE_TEMP_MIN,
++    KEY_TL_HIGHEST_MAX_TEMP,
++    KEY_TL_LOWEST_MIN_TEMP,
++    KEY_TL_TEMP_FALL,
++    KEY_TL_TEMP_RISE,
++    KEY_TL_THERMAL_COEFF_RCC,
++    KEY_TL_THERMAL_COEFF_STEEL,
++)
++
++# Default coefficient of thermal expansion per IRC:6-2017 Amendment No. 6 Cl. 215.4
++DEFAULT_ALPHA_IRC6_AM6_PER_C = 12.0e-6
++
++# Supported bridge support designations (mapped to ospgrillage edge boundary conditions)
++SUPPORTED_SUPPORT_TYPES = {"Pinned", "Roller", "Fixed"}
++
++# Canonical thermal action input keys (distinct from default CTE metadata keys)
++CANONICAL_THERMAL_ACTION_KEYS = (
++    KEY_TL_HIGHEST_MAX_TEMP,
++    KEY_TL_LOWEST_MIN_TEMP,
++    KEY_TL_BRIDGE_TEMP_MIN,
++    KEY_TL_BRIDGE_TEMP_MAX,
++    KEY_TL_TEMP_RISE,
++    KEY_TL_TEMP_FALL,
++)
++
++KEY_TL_INITIAL_REF_TEMP = "loading.temperature_load.initial_ref_temp"
++KEY_TL_INCLUDE_GRADIENT = "loading.temperature_load.include_gradient"
++KEY_SC_LEFT_STIFFNESS_KN_M = "support_conditions.left_bearing_stiffness_kN_m"
++KEY_SC_RIGHT_STIFFNESS_KN_M = "support_conditions.right_bearing_stiffness_kN_m"
++
++_BEAM_ELE_RE = re.compile(
++    r'ops\.element\(\s*"elasticBeamColumn"\s*,\s*(\d+)\s*,\s*\*\[([^\]]+)\]\s*,\s*\*\[([^\]]+)\]\s*,\s*(\d+)'
++)
++
++
++def _is_populated(val) -> bool:
++    if val is None or isinstance(val, bool):
++        return False
++    if isinstance(val, str):
++        s = val.strip()
++        return s != "" and s not in ("—", "-")
++    return True
++
++
++def _parse_finite_float(val, label: str) -> float:
++    if isinstance(val, bool):
++        raise ValueError(f"{label} must be a finite numeric value, got bool {val!r}.")
++    try:
++        num = float(val)
++    except (TypeError, ValueError) as exc:
++        raise ValueError(f"{label} must be numeric, got {val!r}.") from exc
++    if not math.isfinite(num):
++        raise ValueError(f"{label} must be finite, got {val!r}.")
++    return num
++
++
++def _parse_alpha(val, label: str, default_val: float = DEFAULT_ALPHA_IRC6_AM6_PER_C) -> float:
++    if not _is_populated(val):
++        return default_val
++    num = _parse_finite_float(val, label)
++    if num <= 0.0 or num > 1.0e-2:
++        raise ValueError(
++            f"{label} must be in (0, 1e-2] /degC (SI strain per degC, e.g. 12e-6), got {val!r}."
++        )
++    return num
++
++
++def _parse_optional_stiffness(input_dict: dict, key: str, label: str) -> float | None:
++    raw = input_dict.get(key)
++    if not _is_populated(raw):
++        return None
++    val = _parse_finite_float(raw, label)
++    if val <= 0.0:
++        raise ValueError(f"{label} must be strictly positive (kN/m), got {val}.")
++    return val
++
++
++def parse_support_conditions(input_dict: dict) -> dict:
++    """Validate and normalize support types and optional explicit bearing stiffness."""
++    left_raw = input_dict.get(KEY_SC_LEFT_SUPPORT, "Pinned")
++    right_raw = input_dict.get(KEY_SC_RIGHT_SUPPORT, "Roller")
++    left = str(left_raw if _is_populated(left_raw) else "Pinned").strip()
++    right = str(right_raw if _is_populated(right_raw) else "Roller").strip()
++    if left not in SUPPORTED_SUPPORT_TYPES:
++        raise ValueError(
++            f"Unsupported left support '{left}'; expected one of {sorted(SUPPORTED_SUPPORT_TYPES)}."
++        )
++    if right not in SUPPORTED_SUPPORT_TYPES:
++        raise ValueError(
++            f"Unsupported right support '{right}'; expected one of {sorted(SUPPORTED_SUPPORT_TYPES)}."
++        )
++    return {
++        "left_support": left,
++        "right_support": right,
++        "k_left_kN_m": _parse_optional_stiffness(
++            input_dict, KEY_SC_LEFT_STIFFNESS_KN_M, "Left bearing stiffness"
++        ),
++        "k_right_kN_m": _parse_optional_stiffness(
++            input_dict, KEY_SC_RIGHT_STIFFNESS_KN_M, "Right bearing stiffness"
++        ),
++    }
++
++
++def parse_and_validate_thermal_inputs(input_dict: dict) -> dict | None:
++    """Parse canonical thermal inputs, reject invalid/legacy configurations, or return None.
++
++    Returns ``None`` cleanly when no canonical thermal action keys are populated
++    and ``temperature_load_kN_m2`` is absent/zero, preserving valid nonthermal runs.
++    """
++    tl_legacy = input_dict.get("temperature_load_kN_m2")
++    if _is_populated(tl_legacy):
++        legacy_val = _parse_finite_float(tl_legacy, "temperature_load_kN_m2")
++        if legacy_val != 0.0:
++            raise ValueError(
++                "Legacy 'temperature_load_kN_m2' represents vertical deck patch pressure, "
++                "not physical thermal eigenstrain. Remove 'temperature_load_kN_m2' and supply "
++                "canonical Temperature Load keys (KEY_TL_*) instead."
++            )
++
++    configured = [k for k in CANONICAL_THERMAL_ACTION_KEYS if _is_populated(input_dict.get(k))]
++    if not configured:
++        return None
++
++    # Enforce IRC:24 Cl. 504.8 skew limit for grillage thermal analysis
++    skew_raw = input_dict.get(KEY_SKEW_ANGLE)
++    skew_deg = 0.0
++    if _is_populated(skew_raw) and str(skew_raw).strip().lower() != "none":
++        skew_deg = _parse_finite_float(skew_raw, "Skew angle")
++        if abs(skew_deg) > 15.0:
++            raise ValueError(
++                f"Thermal grillage analysis is unsupported for |skew| > 15 deg per IRC:24 Cl. 504.8 (got {skew_deg} deg)."
++            )
++
++    supports = parse_support_conditions(input_dict)
++
++    has_max_air = _is_populated(input_dict.get(KEY_TL_HIGHEST_MAX_TEMP))
++    has_min_air = _is_populated(input_dict.get(KEY_TL_LOWEST_MIN_TEMP))
++    t_max_air = _parse_finite_float(input_dict[KEY_TL_HIGHEST_MAX_TEMP], "Highest maximum air temp") if has_max_air else None
++    t_min_air = _parse_finite_float(input_dict[KEY_TL_LOWEST_MIN_TEMP], "Lowest minimum air temp") if has_min_air else None
++
++    if (t_max_air is not None) ^ (t_min_air is not None):
++        raise ValueError("Both highest_max_temp and lowest_min_temp must be supplied together.")
++    if t_max_air is not None and t_min_air is not None and t_max_air < t_min_air:
++        raise ValueError(
++            f"Invalid air temperature range: highest_max_temp ({t_max_air} C) < lowest_min_temp ({t_min_air} C)."
++        )
++
++    alpha_steel = _parse_alpha(
++        input_dict.get(KEY_TL_THERMAL_COEFF_STEEL), "Coefficient of thermal expansion (steel)"
++    )
++    alpha_rcc = _parse_alpha(
++        input_dict.get(KEY_TL_THERMAL_COEFF_RCC), "Coefficient of thermal expansion (RCC)"
++    )
++
++    has_ebt_min = _is_populated(input_dict.get(KEY_TL_BRIDGE_TEMP_MIN))
++    has_ebt_max = _is_populated(input_dict.get(KEY_TL_BRIDGE_TEMP_MAX))
++    if t_max_air is not None and t_min_air is not None:
++        ebt = IRC6_2017.cl_215_2_effective_bridge_temperature(
++            max_temp=t_max_air,
++            min_temp=t_min_air,
++            structural_type="metallic",
++            snowbound=False,
++        )
++        t_e_min = float(input_dict[KEY_TL_BRIDGE_TEMP_MIN]) if has_ebt_min else float(ebt["T_min"])
++        t_e_max = float(input_dict[KEY_TL_BRIDGE_TEMP_MAX]) if has_ebt_max else float(ebt["T_max"])
++        t_mean_air = 0.5 * (t_max_air + t_min_air)
++        half_band = 10.0 if (t_max_air - t_min_air) > 20.0 else 5.0
++        t0_min = t_mean_air - half_band
++        t0_max = t_mean_air + half_band
++    elif has_ebt_min and has_ebt_max:
++        t_e_min = _parse_finite_float(input_dict[KEY_TL_BRIDGE_TEMP_MIN], "Effective bridge temp min")
++        t_e_max = _parse_finite_float(input_dict[KEY_TL_BRIDGE_TEMP_MAX], "Effective bridge temp max")
++        t0_min = 0.5 * (t_e_min + t_e_max)
++        t0_max = t0_min
++    else:
++        # Rise/fall provided directly without shade temperatures
++        has_r = _is_populated(input_dict.get(KEY_TL_TEMP_RISE))
++        has_f = _is_populated(input_dict.get(KEY_TL_TEMP_FALL))
++        if not (has_r or has_f):
++            raise ValueError("Incomplete thermal inputs: provide shade temperatures or explicit rise/fall.")
++        r_val = _parse_finite_float(input_dict.get(KEY_TL_TEMP_RISE, 0.0), "Temperature rise") if has_r else 0.0
++        f_val = _parse_finite_float(input_dict.get(KEY_TL_TEMP_FALL, 0.0), "Temperature fall") if has_f else 0.0
++        t_e_min, t_e_max = -f_val, r_val
++        t0_min, t0_max = 0.0, 0.0
++
++    if not (math.isfinite(t_e_min) and math.isfinite(t_e_max)) or t_e_max < t_e_min:
++        raise ValueError(f"Invalid effective bridge temperature range [{t_e_min}, {t_e_max}] C.")
++
++    t_mean = 0.5 * (t_e_min + t_e_max)
++    raw_ref = input_dict.get(KEY_TL_INITIAL_REF_TEMP)
++    if _is_populated(raw_ref):
++        t0_used = _parse_finite_float(raw_ref, "Initial reference temperature")
++        ref_source = "user_explicit"
++    else:
++        t0_used = t_mean
++        ref_source = "effective_mean"
++
++    # Compute rise/fall relative to reference temperature unless user supplied both rise/fall directly
++    if _is_populated(input_dict.get(KEY_TL_TEMP_RISE)) and _is_populated(input_dict.get(KEY_TL_TEMP_FALL)) and not _is_populated(raw_ref):
++        delta_t_rise = _parse_finite_float(input_dict[KEY_TL_TEMP_RISE], "Temperature rise")
++        delta_t_fall = _parse_finite_float(input_dict[KEY_TL_TEMP_FALL], "Temperature fall")
++    else:
++        delta_t_rise = max(0.0, t_e_max - t0_used)
++        delta_t_fall = max(0.0, t0_used - t_e_min)
++
++    if delta_t_rise < 0.0 or delta_t_fall < 0.0:
++        raise ValueError(f"Temperature rise ({delta_t_rise}) and fall ({delta_t_fall}) must be >= 0.")
++
++    include_grad_raw = input_dict.get(KEY_TL_INCLUDE_GRADIENT)
++    include_gradient = True if include_grad_raw is None else bool(include_grad_raw)
++
++    return {
++        "configured_keys": configured,
++        "skew_deg": skew_deg,
++        "T_max_air_C": t_max_air,
++        "T_min_air_C": t_min_air,
++        "T_e_min_C": t_e_min,
++        "T_e_max_C": t_e_max,
++        "T_mean_C": t_mean,
++        "T0_min_C": t0_min,
++        "T0_max_C": t0_max,
++        "T0_used_C": t0_used,
++        "ref_source": ref_source,
++        "delta_T_rise_C": delta_t_rise,
++        "delta_T_fall_C": delta_t_fall,
++        "alpha_steel_per_C": alpha_steel,
++        "alpha_rcc_per_C": alpha_rcc,
++        "include_gradient": include_gradient,
++        **supports,
++        "standards_basis": (
++            "IRC:6-2017 Cl. 215 (Am. No. 6 Cl. 215.2/215.4, Table 15; "
++            "Am. No. 8 Table B.2/B.3 factors; Am. No. 10 restraint terminology); "
++            "IRC:24-2010 Cl. 504.8 skew <= 15 deg"
++        ),
++    }
++
++
++def build_composite_section_layers(
++    steel_dims: dict,
++    b_eff_m: float,
++    t_slab_m: float,
++    E_s_Pa: float,
++    E_c_Pa: float,
++    alpha_steel: float,
++    alpha_rcc: float,
++    h_haunch_m: float = 0.0,
++) -> list[dict]:
++    """Build bottom-to-top rectangular layers ``(y_bot, y_top, width, E_Pa, alpha)``.
++
++    ``y`` is measured upward from the soffit of the bottom steel flange (m).
++    """
++    t_fb = float(steel_dims["tf_bot_m"])
++    b_fb = float(steel_dims["bf_bot_m"])
++    d_w = float(steel_dims["dw_m"])
++    t_w = float(steel_dims["tw_m"])
++    t_ft = float(steel_dims["tf_top_m"])
++    b_ft = float(steel_dims["bf_top_m"])
++    D_steel = t_fb + d_w + t_ft
++
++    layers = [
++        {"name": "steel_bot_flange", "y_bot_m": 0.0, "y_top_m": t_fb, "width_m": b_fb, "E_Pa": E_s_Pa, "alpha_per_C": alpha_steel},
++        {"name": "steel_web",        "y_bot_m": t_fb, "y_top_m": t_fb + d_w, "width_m": t_w, "E_Pa": E_s_Pa, "alpha_per_C": alpha_steel},
++        {"name": "steel_top_flange", "y_bot_m": t_fb + d_w, "y_top_m": D_steel, "width_m": b_ft, "E_Pa": E_s_Pa, "alpha_per_C": alpha_steel},
++    ]
++    y_cur = D_steel
++    if h_haunch_m > 0.0:
++        layers.append({
++            "name": "concrete_haunch",
++            "y_bot_m": y_cur,
++            "y_top_m": y_cur + h_haunch_m,
++            "width_m": b_ft,
++            "E_Pa": E_c_Pa,
++            "alpha_per_C": alpha_rcc,
++        })
++        y_cur += h_haunch_m
++    if t_slab_m > 0.0 and b_eff_m > 0.0:
++        layers.append({
++            "name": "concrete_slab",
++            "y_bot_m": y_cur,
++            "y_top_m": y_cur + t_slab_m,
++            "width_m": float(b_eff_m),
++            "E_Pa": E_c_Pa,
++            "alpha_per_C": alpha_rcc,
++        })
++    return layers
++
++
++def compute_composite_thermal_section(
++    layers: list[dict],
++    E_ref_Pa: float,
++    dT_fn: Callable[[float, float], float],
++    dy_m: float = 0.001,
++) -> dict:
++    """Integrate E-weighted composite stiffness, thermal resultants, and eigenstresses.
++
++    Parameters
++    ----------
++    layers : list of dict
++        Each dict specifies ``name``, ``y_bot_m``, ``y_top_m``, ``width_m``,
++        ``E_Pa``, and ``alpha_per_C`` (coordinate ``y`` upward from steel soffit).
++    E_ref_Pa : float
++        Reference steel Young's modulus (Pa) used by OpenSees beam elements.
++    dT_fn : callable
++        ``dT_fn(y_from_bot_m, D_total_m) -> delta_T_C``.
++    dy_m : float
++        Vertical integration strip step (m).
++    """
++    if not layers:
++        raise ValueError("At least one layer is required for composite thermal integration.")
++    D_total = max(float(layer["y_top_m"]) for layer in layers)
++
++    ea_total = 0.0
++    ea_y_sum = 0.0
++    n_th = 0.0
++    m_y_sum = 0.0
++
++    # First pass: EA_comp, neutral axis y_NA_from_bot, N_th
++    strips = []
++    for layer in layers:
++        y0 = float(layer["y_bot_m"])
++        y1 = float(layer["y_top_m"])
++        h = y1 - y0
++        if h <= 0.0:
++            continue
++        w = float(layer["width_m"])
++        E_i = float(layer["E_Pa"])
++        alpha_i = float(layer["alpha_per_C"])
++        n_strips = max(1, int(math.ceil(h / dy_m)))
++        step = h / n_strips
++        for k in range(n_strips):
++            ym = y0 + (k + 0.5) * step
++            dA = w * step
++            ea_i = E_i * dA
++            ea_total += ea_i
++            ea_y_sum += ea_i * ym
++            dT = float(dT_fn(ym, D_total))
++            dF_th = ea_i * alpha_i * dT
++            n_th += dF_th
++            m_y_sum += dF_th * ym
++            strips.append((ym, w, step, dA, E_i, alpha_i, dT))
++
++    if ea_total <= 0.0:
++        raise ValueError("Composite section axial stiffness EA must be positive.")
++
++    y_na = ea_y_sum / ea_total
++    ei_total = 0.0
++    for ym, w, step, dA, E_i, _, _ in strips:
++        ei_total += E_i * (w * step**3 / 12.0 + dA * (ym - y_na) ** 2)
++
++    m_th = m_y_sum - y_na * n_th
++    eps0 = n_th / ea_total
++    # Standard upward y: positive M_th means top expands more -> hogging (+kappa_local for vecxz=(0,0,-1))
++    kappa_up = m_th / ei_total
++
++    # Verify self-equilibrating eigenstress resultant check under free expansion/bowing
++    residual_N = 0.0
++    residual_M = 0.0
++    max_eigen_MPa = 0.0
++    min_eigen_MPa = 0.0
++    layer_extreme_stresses_MPa = {}
++    for layer in layers:
++        y0 = float(layer["y_bot_m"])
++        y1 = float(layer["y_top_m"])
++        if y1 <= y0:
++            continue
++        E_i = float(layer["E_Pa"])
++        alpha_i = float(layer["alpha_per_C"])
++        for tag, yy in (("bot", y0), ("top", y1)):
++            sig = E_i * (eps0 + kappa_up * (yy - y_na) - alpha_i * float(dT_fn(yy, D_total))) / 1.0e6
++            layer_extreme_stresses_MPa[f"{layer['name']}_{tag}"] = round(sig, 4)
++
++    for ym, _, step, dA, E_i, alpha_i, dT in strips:
++        sig_pa = E_i * (eps0 + kappa_up * (ym - y_na) - alpha_i * dT)
++        sig_mpa = sig_pa / 1.0e6
++        if sig_mpa > max_eigen_MPa:
++            max_eigen_MPa = sig_mpa
++        if sig_mpa < min_eigen_MPa:
++            min_eigen_MPa = sig_mpa
++        residual_N += sig_pa * dA
++        # Exact linear stress variation across strip thickness adds E * kappa * I_strip
++        w_strip = dA / step if step > 0.0 else 0.0
++        residual_M += sig_pa * (ym - y_na) * dA + E_i * kappa_up * w_strip * (step**3) / 12.0
++
++    return {
++        "D_total_m": D_total,
++        "y_NA_from_bot_m": y_na,
++        "EA_comp_N": ea_total,
++        "EI_z_comp_Nm2": ei_total,
++        "A_eq_steel_m2": ea_total / E_ref_Pa,
++        "Iz_eq_steel_m4": ei_total / E_ref_Pa,
++        "N_thermal_N": n_th,
++        "M_z_thermal_Nm": m_th,
++        "free_axial_strain": eps0,
++        "free_curvature_per_m": kappa_up,
++        "eigenstress_residual_N": residual_N,
++        "eigenstress_residual_Nm": residual_M,
++        "max_eigenstress_MPa": max_eigen_MPa,
++        "min_eigenstress_MPa": min_eigen_MPa,
++        "layer_extreme_stresses_MPa": layer_extreme_stresses_MPa,
++    }
++
++
++def beam_stiffness_local_12dof(
++    EA: float, GJ: float, EIy: float, EIz: float, length: float
++) -> np.ndarray:
++    """Exact 12x12 3D Euler-Bernoulli beam stiffness matrix in OpenSees local axes."""
++    l = float(length)
++    k = np.zeros((12, 12), dtype=float)
++
++    def put(dofs: tuple[int, ...], block: np.ndarray) -> None:
++        for r, di in enumerate(dofs):
++            for c, dj in enumerate(dofs):
++                k[di, dj] += block[r, c]
++
++    put((0, 6), (EA / l) * np.array([[1.0, -1.0], [-1.0, 1.0]]))
++    put((3, 9), (GJ / l) * np.array([[1.0, -1.0], [-1.0, 1.0]]))
++    # Bending in local (x, y) plane -> local y translation & rotation about local z
++    bz = EIz * np.array([
++        [12.0 / l**3, 6.0 / l**2, -12.0 / l**3, 6.0 / l**2],
++        [6.0 / l**2,  4.0 / l,    -6.0 / l**2,  2.0 / l],
++        [-12.0 / l**3, -6.0 / l**2, 12.0 / l**3, -6.0 / l**2],
++        [6.0 / l**2,  2.0 / l,    -6.0 / l**2,  4.0 / l],
++    ])
++    put((1, 5, 7, 11), bz)
++    # Bending in local (x, z) plane -> local z translation & rotation about local y
++    by = EIy * np.array([
++        [12.0 / l**3, -6.0 / l**2, -12.0 / l**3, -6.0 / l**2],
++        [-6.0 / l**2, 4.0 / l,     6.0 / l**2,   2.0 / l],
++        [-12.0 / l**3, 6.0 / l**2, 12.0 / l**3,  6.0 / l**2],
++        [-6.0 / l**2, 2.0 / l,     6.0 / l**2,   4.0 / l],
++    ])
++    put((2, 4, 8, 10), by)
++    return k
++
++
++def element_local_to_global_rotation(
++    p_i: list[float], p_j: list[float], vecxz: list[float]
++) -> np.ndarray:
++    """Return 3x3 orthonormal rotation ``R`` where ``v_global = R @ v_local``.
++
++    Follows OpenSeesPy ``geomTransf Linear`` right-handed local axes:
++      e_x = (p_j - p_i) / ||p_j - p_i||
++      e_y = (vecxz x e_x) / ||vecxz x e_x||
++      e_z = e_x x e_y
++    """
++    dx = np.asarray(p_j, dtype=float) - np.asarray(p_i, dtype=float)
++    length = float(np.linalg.norm(dx))
++    if length <= 0.0:
++        raise ValueError("Degenerate zero-length element encountered during thermal load assembly.")
++    e_x = dx / length
++    vxz = np.asarray(vecxz, dtype=float)
++    e_y = np.cross(vxz, e_x)
++    ey_norm = float(np.linalg.norm(e_y))
++    if ey_norm <= 1e-12:
++        raise ValueError(f"vecxz={vecxz} is parallel to element axis {e_x.tolist()}.")
++    e_y = e_y / ey_norm
++    e_z = np.cross(e_x, e_y)
++    return np.column_stack([e_x, e_y, e_z])
++
++
++def _extract_model_transform_map(model) -> dict[int, list[float]]:
++    """Map integer geomTransf tag -> vecxz [x, y, z] from model.Mesh_obj.transform_dict."""
++    ns = {"np": np}
++    out: dict[int, list[float]] = {}
++    for key_str, tag in getattr(model.Mesh_obj, "transform_dict", {}).items():
++        vxz_str = key_str.split("|", 1)[0]
++        vxz = [float(x) for x in eval(vxz_str, ns)]
++        out[int(tag)] = vxz
++    return out
++
++
++def parse_beam_elements_from_model(model) -> dict[int, dict]:
++    """Extract live/registered elasticBeamColumn parameters per element tag."""
++    transf_map = _extract_model_transform_map(model)
++    specs: dict[int, dict] = {}
++    for etag, cmd in getattr(model, "element_command_list", {}).items():
++        m = _BEAM_ELE_RE.search(str(cmd))
++        if not m:
++            continue
++        parsed_tag = int(m.group(1))
++        nodes = [int(x.strip()) for x in m.group(2).split(",")]
++        props = [float(ast.literal_eval(x.strip())) for x in m.group(3).split(",")]
++        t_tag = int(m.group(4))
++        if len(nodes) != 2 or len(props) != 6:
++            continue
++        A, E, G, J, Iy, Iz = props
++        specs[parsed_tag] = {
++            "ele_tag": parsed_tag,
++            "nodes": nodes,
++            "A": A,
++            "E": E,
++            "G": G,
++            "J": J,
++            "Iy": Iy,
++            "Iz": Iz,
++            "vecxz": transf_map.get(t_tag, [0.0, 0.0, -1.0]),
++        }
++    return specs
++
++
++def build_thermal_element_load(
++    model,
++    name: str,
++    per_element_strains: dict[int, tuple[float, float]],
++    metadata: dict | None = None,
++) -> ThermalElementLoad:
++    """Assemble ``ThermalElementLoad`` from per-element ``(eps0, kappa_up)`` strains.
++
++    Parameters
++    ----------
++    model : OspGrillage
++        Instantiated ospgrillage model (``create_osp_model()`` already called).
++    name : str
++        Load identifier.
++    per_element_strains : dict[int, tuple[float, float]]
++        Maps OpenSees element tag -> ``(free_axial_strain, free_curvature_per_m)``
++        where positive ``free_axial_strain`` elongates the beam and positive
++        ``free_curvature_per_m`` denotes upward-convex bowing (top hotter than bottom).
++    """
++    beam_specs = parse_beam_elements_from_model(model)
++    node_coords = {
++        int(nid): [round(float(c), 4) for c in spec["coordinate"]]
++        for nid, spec in model.Mesh_obj.node_spec.items()
++    }
++
++    element_fth_local: dict[int, list[float]] = {}
++    element_fth_global: dict[int, list[float]] = {}
++    nodal_loads_global: dict[int, np.ndarray] = {}
++
++    up_y = np.array([0.0, 1.0, 0.0], dtype=float)
++
++    for ele_tag, (eps0, kappa_up) in per_element_strains.items():
++        spec = beam_specs.get(int(ele_tag))
++        if spec is None:
++            raise KeyError(f"Element tag {ele_tag} is not an elasticBeamColumn in ospgrillage model.")
++        n_i, n_j = spec["nodes"]
++        p_i = node_coords[n_i]
++        p_j = node_coords[n_j]
++        length = float(np.linalg.norm(np.asarray(p_j) - np.asarray(p_i)))
++
++        R = element_local_to_global_rotation(p_i, p_j, spec["vecxz"])
++        # Project local +y axis onto global +Y: if local +y = -global Y (standard vecxz),
++        # sign is +1 so positive upward bowing kappa_up gives positive q0[7], q0[11].
++        kappa_local = -float(np.dot(R[:, 1], up_y)) * float(kappa_up)
++
++        EA = spec["E"] * spec["A"]
++        GJ = spec["G"] * spec["J"]
++        EIy = spec["E"] * spec["Iy"]
++        EIz = spec["E"] * spec["Iz"]
++        k_loc = beam_stiffness_local_12dof(EA, GJ, EIy, EIz, length)
++
++        q0 = np.zeros(12, dtype=float)
++        q0[6] = float(eps0) * length
++        q0[7] = kappa_local * (length**2) / 2.0
++        q0[11] = kappa_local * length
++
++        fth_loc = k_loc @ q0
++        T12 = np.zeros((12, 12), dtype=float)
++        for blk in range(4):
++            s = blk * 3
++            T12[s:s + 3, s:s + 3] = R
++        # Local-to-global nodal force transformation: f_global = T_12 @ f_local (since R columns are local axes)
++        fth_glob = T12 @ fth_loc
++
++        element_fth_local[int(ele_tag)] = fth_loc.tolist()
++        element_fth_global[int(ele_tag)] = fth_glob.tolist()
++
++        nodal_loads_global[n_i] = nodal_loads_global.get(n_i, np.zeros(6, dtype=float)) + fth_glob[:6]
++        nodal_loads_global[n_j] = nodal_loads_global.get(n_j, np.zeros(6, dtype=float)) + fth_glob[6:12]
++
++    nodal_out = {
++        nid: vec.tolist()
++        for nid, vec in nodal_loads_global.items()
++    }
++    return ThermalElementLoad(
++        name=name,
++        element_fth_local=element_fth_local,
++        element_fth_global=element_fth_global,
++        nodal_loads_global=nodal_out,
++        metadata=metadata,
++    )
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/validator.py b/src/osdagbridge/core/bridge_types/plate_girder/validator.py
+index 3575a40..bfae5f2 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/validator.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/validator.py
+@@ -746,11 +746,51 @@ class BridgeInputValidator:
+         # ── Temperature Load ───────────────────────────────────────────────────
+         elif key == KEY_TL_THERMAL_COEFF_STEEL:
+             v = self._to_float(inputs.get(key))
+-            if v is None: return 0.0, "Coefficient of thermal expansion for steel must be a numeric value."
++            if v is None:
++                return 12.0e-6, "Coefficient of thermal expansion for steel must be a finite numeric value."
++            if v <= 0.0 or v > 1.0e-3:
++                return 12.0e-6, "Coefficient of thermal expansion for steel must be > 0 and <= 1.0e-3 /°C."
+ 
+         elif key == KEY_TL_THERMAL_COEFF_RCC:
+             v = self._to_float(inputs.get(key))
+-            if v is None: return 0.0, "Coefficient of thermal expansion for RCC must be a numeric value."
++            if v is None:
++                return 12.0e-6, "Coefficient of thermal expansion for RCC must be a finite numeric value."
++            if v <= 0.0 or v > 1.0e-3:
++                return 12.0e-6, "Coefficient of thermal expansion for RCC must be > 0 and <= 1.0e-3 /°C."
++
++        elif key in (KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP, KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX):
++            v = self._to_float(inputs.get(key))
++            if v is None:
++                return 0.0, f"Temperature '{key}' must be a finite numeric value."
++            if v < -80.0 or v > 120.0:
++                return max(-80.0, min(120.0, v)), f"Temperature '{key}' must be between -80°C and 120°C."
++            if key in (KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP):
++                tmax = self._to_float(inputs.get(KEY_TL_HIGHEST_MAX_TEMP))
++                tmin = self._to_float(inputs.get(KEY_TL_LOWEST_MIN_TEMP))
++                if tmax is not None and tmin is not None and tmax < tmin:
++                    return tmin, "Highest maximum air temperature must be >= lowest minimum air temperature."
++            if key in (KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX):
++                bmax = self._to_float(inputs.get(KEY_TL_BRIDGE_TEMP_MAX))
++                bmin = self._to_float(inputs.get(KEY_TL_BRIDGE_TEMP_MIN))
++                if bmax is not None and bmin is not None and bmax < bmin:
++                    return bmin, "Effective maximum bridge temperature must be >= minimum bridge temperature."
++
++        elif key in (KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL):
++            v = self._to_float(inputs.get(key))
++            if v is None:
++                return 0.0, f"Temperature differential '{key}' must be a finite numeric value."
++            if v < 0.0 or v > 200.0:
++                return max(0.0, min(200.0, v)), f"Temperature differential '{key}' must be between 0°C and 200°C."
++
++        elif key == "temperature_load_kN_m2":
++            raw = inputs.get(key)
++            if raw not in (None, ""):
++                v = self._to_float(raw)
++                if v is None or v != 0.0:
++                    return 0.0, (
++                        "Legacy 'temperature_load_kN_m2' represents vertical deck pressure, "
++                        "not thermal eigenstrain; remove it and configure canonical KEY_TL_* thermal inputs."
++                    )
+ 
+         # ═══LOADING-TAB-VALIDATORS-ENDS══════════════════════════════════════════════════════════════════
+ 
+diff --git a/src/osdagbridge/core/reports/chap3.py b/src/osdagbridge/core/reports/chap3.py
+index 73f1bcf..3dae711 100644
+--- a/src/osdagbridge/core/reports/chap3.py
++++ b/src/osdagbridge/core/reports/chap3.py
+@@ -40,6 +40,8 @@ from osdagbridge.core.utils.common import (
+     KEY_TL_LOWEST_MIN_TEMP,
+     KEY_TL_TEMP_FALL,
+     KEY_TL_TEMP_RISE,
++    KEY_TL_THERMAL_COEFF_RCC,
++    KEY_TL_THERMAL_COEFF_STEEL,
+     KEY_WC_LD_LANE_TABLE_COUNT,
+     KEY_WC_MATERIAL,
+     KEY_WC_THICKNESS,
+@@ -371,19 +373,49 @@ This section summarizes all loads applied to the bridge and the load combination
+ \end{longtable}
+ 
+ \vspace{1em}
+-\begin{longtable}{|L{5.5cm}|p{10.0cm}|}
+-\caption{\textbf{Temperature Load (TL) --- per IRC 6}}
++\begin{longtable}{|L{6.0cm}|p{9.5cm}|}
++\caption{\textbf{Temperature Load (TL) --- per IRC:6-2017 Cl. 215 (with Am. No. 6)}}
+ \\
+ \hline
+ \textbf{parameter} & \textbf{value} \\
+ \hline
+-\textnormal{Maximum Shade Temperature} & """ + (_render_value(input_dict,'shade_temp_max')) + r""" $^\circ$C \\[6pt]
+-\hline
+-\textnormal{Minimum Shade Temperature} & """ + (_render_value(input_dict,'shade_temp_min')) + r""" $^\circ$C \\[6pt]
+-\hline
+-\textnormal{Effective Bridge Temp. Range} & """ + (_render_value(input_dict, KEY_TL_BRIDGE_TEMP_MIN)) + r""" to """ + (_render_value(input_dict, KEY_TL_BRIDGE_TEMP_MAX)) + r""" $^\circ$C \\[6pt]
+-\hline
+-\textnormal{Temperature Rise / Fall for Design} & +""" + (_render_value(input_dict, KEY_TL_TEMP_RISE)) + r""" $^\circ$C / \textminus{}""" + (_render_value(input_dict, KEY_TL_TEMP_FALL)) + r""" $^\circ$C \\[6pt]
++\textnormal{Maximum Shade Air Temperature} & """ + (
++        _render_value(input_dict, KEY_TL_HIGHEST_MAX_TEMP)
++        if input_dict.get(KEY_TL_HIGHEST_MAX_TEMP) not in (None, "")
++        else _render_value(input_dict, 'shade_temp_max')
++    ) + r""" $^\circ$C \\[6pt]
++\hline
++\textnormal{Minimum Shade Air Temperature} & """ + (
++        _render_value(input_dict, KEY_TL_LOWEST_MIN_TEMP)
++        if input_dict.get(KEY_TL_LOWEST_MIN_TEMP) not in (None, "")
++        else _render_value(input_dict, 'shade_temp_min')
++    ) + r""" $^\circ$C \\[6pt]
++\hline
++\textnormal{Thermal Expansion Coeff. ($\alpha_{steel}$ / $\alpha_{RCC}$)} & """ + (
++        _tex(str(input_dict.get(KEY_TL_THERMAL_COEFF_STEEL) or "12.0e-6"))
++    ) + r""" / """ + (
++        _tex(str(input_dict.get(KEY_TL_THERMAL_COEFF_RCC) or "12.0e-6"))
++    ) + r""" /$^\circ$C \\[6pt]
++\hline
++\textnormal{Effective Bridge Temp. Range} & """ + (
++        _render_value(input_dict, KEY_TL_BRIDGE_TEMP_MIN)
++        if input_dict.get(KEY_TL_BRIDGE_TEMP_MIN) not in (None, "")
++        else _tex(str(tl_temp_min))
++    ) + r""" to """ + (
++        _render_value(input_dict, KEY_TL_BRIDGE_TEMP_MAX)
++        if input_dict.get(KEY_TL_BRIDGE_TEMP_MAX) not in (None, "")
++        else _tex(str(tl_temp_max))
++    ) + r""" $^\circ$C \\[6pt]
++\hline
++\textnormal{Temperature Rise / Fall for Design} & +""" + (
++        _render_value(input_dict, KEY_TL_TEMP_RISE)
++        if input_dict.get(KEY_TL_TEMP_RISE) not in (None, "")
++        else _tex(str(tl_rise))
++    ) + r""" $^\circ$C / \textminus{}""" + (
++        _render_value(input_dict, KEY_TL_TEMP_FALL)
++        if input_dict.get(KEY_TL_TEMP_FALL) not in (None, "")
++        else _tex(str(tl_fall))
++    ) + r""" $^\circ$C \\[6pt]
+ \hline
+ \end{longtable}
+ 
+diff --git a/src/osdagbridge/core/reports/chap4.py b/src/osdagbridge/core/reports/chap4.py
+index 01bdd98..a39eb79 100644
+--- a/src/osdagbridge/core/reports/chap4.py
++++ b/src/osdagbridge/core/reports/chap4.py
+@@ -1,3 +1,4 @@
++from collections.abc import Mapping
+ from typing import TYPE_CHECKING
+ from osdagbridge.core.utils.common import (
+     KEY_SPAN,
+@@ -75,6 +76,67 @@ def ch4_analysis(asum, fig_paths, bridge: "ReportDataBridge", span_m: float):
+     _allow_total_str = f"L/600 = {_allow_total_mm:.1f} mm"
+     _live_status     = ("PASS" if _live_mm  <= _allow_live_mm  else r"\textcolor{red}{FAIL}") if _live_mm  is not None else "---"
+     _total_status    = ("PASS" if _total_mm <= _allow_total_mm else r"\textcolor{red}{FAIL}") if _total_mm is not None else "---"
++    rxn_rows = [
++        _tex(lc)
++        + r" & "
++        + _fmt(rxn_summary[lc].get("left_kN"))
++        + r" & "
++        + _fmt(rxn_summary[lc].get("right_kN"))
++        + r" \\[6pt]"
++        for lc in all_lcs
++        if lc in rxn_summary
++    ]
++    rxn_body = ("\n\\hline\n").join(rxn_rows) if rxn_rows else r"--- & --- & --- \\[6pt]"
++
++    out_dict = getattr(bridge, "output_dict", {}) or {}
++    thermal_info = out_dict.get("thermal_analysis") if isinstance(out_dict, Mapping) else None
++    thermal_section_tex = ""
++    if isinstance(thermal_info, Mapping) and thermal_info.get("spec"):
++        tspec = thermal_info["spec"]
++        tsum = thermal_info.get("solver_summary", {}) or {}
++        t_rows = []
++        for lc_name in thermal_info.get("load_cases", []):
++            sr = tsum.get(lc_name, {})
++            t_rows.append(
++                _tex(lc_name)
++                + r" & " + _fmt(sr.get("dx_max_mm"), 4)
++                + r" & " + _fmt(sr.get("dy_mid_max_mm"), 4)
++                + r" & " + _fmt(sr.get("N_max_kN"), 3)
++                + r" & " + _fmt(sr.get("Mz_max_kNm"), 3)
++                + r" & " + _fmt(sr.get("rx_equilibrium_residual_kN"), 6)
++                + r" \\[6pt]"
++            )
++        t_body = ("\n\\hline\n").join(t_rows) if t_rows else r"--- & --- & --- & --- & --- & --- \\[6pt]"
++        left_sup = str(tspec.get("left_support", "Pinned"))
++        right_sup = str(tspec.get("right_support", "Roller"))
++        kl_s = f"{float(tspec['k_left_kN_m']):.1f} kN/m" if tspec.get("k_left_kN_m") is not None else left_sup
++        kr_s = f"{float(tspec['k_right_kN_m']):.1f} kN/m" if tspec.get("k_right_kN_m") is not None else right_sup
++        thermal_section_tex = (
++            "\n\\vspace{1em}\n"
++            "\\noindent\\textbf{Thermal Analysis Summary (IRC:6-2017 Cl. 215)}\\\\\n"
++            f"Supports (Left / Right): {_tex(kl_s)} / {_tex(kr_s)}; "
++            f"$T_0 = {float(tspec.get('T0_used_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
++            f"$\\Delta T_{{rise}} = +{float(tspec.get('delta_T_rise_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
++            f"$\\Delta T_{{fall}} = -{float(tspec.get('delta_T_fall_C', 0.0)):.2f}^\\circ\\mathrm{{C}}$; "
++            f"$\\alpha_{{steel}} = {float(tspec.get('alpha_steel_per_C', 12e-6)):.3e}/^\\circ\\mathrm{{C}}$; "
++            f"$\\alpha_{{RCC}} = {float(tspec.get('alpha_rcc_per_C', 12e-6)):.3e}/^\\circ\\mathrm{{C}}$.\n"
++            "\\begin{longtable}{|"
++            ">{\\centering\\arraybackslash}p{3.4cm}|"
++            ">{\\centering\\arraybackslash}p{2.0cm}|"
++            ">{\\centering\\arraybackslash}p{2.0cm}|"
++            ">{\\centering\\arraybackslash}p{2.2cm}|"
++            ">{\\centering\\arraybackslash}p{2.3cm}|"
++            ">{\\centering\\arraybackslash}p{2.4cm}|}\n"
++            "\\caption{\\textbf{Thermal Load Case Responses}}\\\\\n"
++            "\\hline\n"
++            "\\textbf{Thermal Case} & \\textbf{$\\Delta x_{max}$ (mm)} & \\textbf{$\\Delta y_{max}$ (mm)} "
++            "& \\textbf{Max $N$ (kN)} & \\textbf{Max $M_z$ (kNm)} & \\textbf{$|\\Sigma R_x|$ (kN)} \\\\[6pt]\n"
++            "\\hline\n"
++            + t_body + "\n"
++            "\\hline\n"
++            "\\end{longtable}\n"
++        )
++
+     return r"""
+ \chapter{Analysis Results}
+ 
+@@ -147,11 +209,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
+ \hline
+ \textbf{Load Case} & \textbf{Left Support (kN)} & \textbf{Right Support (kN)} \\[6pt]
+ \hline
+- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+-\hline
+- & """ + '' + r""" & """ + '' + r""" \\[6pt]
+-\hline
+- & """ + '' + r""" & """ + '' + r""" \\[6pt]
++""" + rxn_body + r"""
+ \hline
+ \end{longtable}
+ 
+@@ -175,6 +233,7 @@ A grillage model was used for structural analysis. The deck is idealized as a gr
+ \textnormal{Total Load Deflection Check Status} & """ + _total_status + r""" \\[6pt]
+ \hline
+ \end{longtable}
++""" + thermal_section_tex + r"""
+ 
+ \vspace{1em}
+ \noindent
+diff --git a/src/osdagbridge/core/reports/chap8.py b/src/osdagbridge/core/reports/chap8.py
+index 7770c21..9ed61f4 100644
+--- a/src/osdagbridge/core/reports/chap8.py
++++ b/src/osdagbridge/core/reports/chap8.py
+@@ -106,10 +106,10 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
+ \textbf{Structural Analysis}
+ 
+ \begin{itemize}
+-    \item All girders are modelled as simply supported; continuous spans are not currently supported.
+-    \item A 3D grillage model (OSPGrillage) is used for load distribution. Grillage members carry composite section properties after the construction stage.
+-    \item The transverse member forces are computed using an approximate 2D frame analogy. For irregular or skewed geometries, a 3D FEM is recommended.
+-    \item Fixed bearing stiffness is modelled as $k = 1{,}000{,}000 \,\text{kN/m}$ (virtually rigid); free/expansion bearing as $k = 100 \, \text{kN/m}$.
++    \item All girders are modelled as simply supported single-span bridges (supports selectable as Pinned, Roller, Fixed, or optional finite longitudinal bearing springs); continuous spans are not currently supported.
++    \item A 3D grillage model (OSPGrillage / OpenSeesPy) is used for load distribution. When thermal loading is active, longitudinal girders carry transformed composite steel--concrete properties ($A_{eq}, I_{z,eq}$ referenced to $E_s$) with exact element-local internal force recovery ($K_{local} q_{local} - f_{th,local}$).
++    \item The transverse member forces are computed using an approximate 2D frame analogy. For irregular or heavily skewed geometries, a full 3D finite-element analysis is recommended.
++    \item In analytical bearing summary mode, default fixed-bearing stiffness is $k = 1{,}000{,}000 \,\text{kN/m}$ and free/expansion bearing is $k = 100 \, \text{kN/m}$, unless explicit longitudinal spring stiffnesses are specified on the structural model.
+     \item Construction stage sequence analysis is approximate. Detailed staged analysis should be performed for long-term deflection checks.
+ \end{itemize}
+ 
+@@ -151,6 +151,7 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
+ \item Multi-lane live load reduction factors per IRC 6:2017 Cl.204.4 Table 6A: 1st lane = 1.0, 2nd lane = 0.8, 3rd lane onwards = 0.4.
+ \item Impact factor (dynamic load allowance) computed from span per IRC 6:2017 Cl.208.2/208.3.
+ \item Wind load applied as transverse, longitudinal, and vertical components per IRC 6:2017 Cl.209.3.3--209.3.5.
++\item Thermal loading follows IRC:6-2017 Cl. 215 (including Amendment No. 6 May 2021 default CTE $12.0 \times 10^{-6}/^\circ\mathrm{C}$ when user CTE is omitted, Table 15 effective temperature bounds, Cl. 215.4 composite heating/cooling gradients, Amendment No. 8 Tables B.2/B.3 factors, and Amendment No. 10 support restraint vs bearing friction terminology).
+ \end{itemize}
+ 
+ \textbf{Serviceability Limits}
+@@ -182,11 +183,11 @@ IS 2062 & 2011 & Structural steel - yield and ultimate strength by grade \\
+ \begin{itemize}
+ \item Substructure (piers, pile caps, foundations) and bearing design are not included.
+ \item Splice connection design is not implemented.
+-\item Skew angle $>$ 15 degrees requires independent manual analysis (IRC 24 Cl. 504.8).
++\item Skew angle $>$ 15 degrees requires independent manual analysis (IRC 24 Cl. 504.8); thermal grillage analysis explicitly rejects $|skew| > 15^\circ$.
+ \item Construction stage sequence analysis is approximate; detailed staged analysis
+   should be performed for long-term deflection checks.
+-\item The grillage analysis assumes simply supported boundary conditions;
+-  continuous spans are not currently supported.
++\item The grillage analysis assumes simply supported single-span boundary conditions (or explicit longitudinal bearing spring stiffnesses); continuous multi-span bridges are not currently supported.
++\item Thermal eigenstrain in the current 3D grillage solver acts along the structural longitudinal composite girders; transverse deck slab thermal expansion across Z-restrained abutment supports is not applied.
+ \end{itemize}
+ """)
+ 
+diff --git a/src/osdagbridge/core/utils/osi_validator.py b/src/osdagbridge/core/utils/osi_validator.py
+index d10104b..b19e97a 100644
+--- a/src/osdagbridge/core/utils/osi_validator.py
++++ b/src/osdagbridge/core/utils/osi_validator.py
+@@ -50,6 +50,9 @@ from osdagbridge.core.utils.common import (
+     KEY_WL_SUPER_AREA_ELEV_VALUE, KEY_WL_SUPER_AREA_PLAIN_VALUE,
+     KEY_WL_EXPOSED_FRONTAL_VALUE,
+     KEY_WL_WIND_ECC_DECK_VALUE, KEY_WL_WIND_LL_ECC_VALUE,
++    KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP,
++    KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX,
++    KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL,
+     KEY_TL_THERMAL_COEFF_STEEL, KEY_TL_THERMAL_COEFF_RCC,
+     KEY_DS_TOP_CLEAR_COVER, KEY_DS_BOTTOM_CLEAR_COVER, KEY_DS_SIDE_CLEAR_COVER,
+     KEY_DS_STUD_YIELD_STRENGTH, KEY_DS_STUD_ULTIMATE_STRENGTH,
+@@ -102,6 +105,9 @@ _ADDITIONAL_KEYS = [
+     KEY_WL_SUPER_AREA_ELEV_VALUE, KEY_WL_SUPER_AREA_PLAIN_VALUE,
+     KEY_WL_EXPOSED_FRONTAL_VALUE, KEY_WL_WIND_ECC_DECK_VALUE,
+     KEY_WL_WIND_LL_ECC_VALUE,
++    KEY_TL_HIGHEST_MAX_TEMP, KEY_TL_LOWEST_MIN_TEMP,
++    KEY_TL_BRIDGE_TEMP_MIN, KEY_TL_BRIDGE_TEMP_MAX,
++    KEY_TL_TEMP_RISE, KEY_TL_TEMP_FALL,
+     KEY_TL_THERMAL_COEFF_STEEL, KEY_TL_THERMAL_COEFF_RCC,
+     KEY_DS_TOP_CLEAR_COVER, KEY_DS_BOTTOM_CLEAR_COVER, KEY_DS_SIDE_CLEAR_COVER,
+     KEY_DS_STUD_YIELD_STRENGTH, KEY_DS_STUD_ULTIMATE_STRENGTH,
+@@ -143,6 +149,18 @@ class OsiInputValidator:
+ 
+         self._validate_design_mode(flat, result)
+ 
++        raw_tl_legacy = flat.get("temperature_load_kN_m2")
++        if not self._is_missing(raw_tl_legacy):
++            try:
++                val_legacy = float(raw_tl_legacy)
++            except (TypeError, ValueError, OverflowError):
++                val_legacy = float("nan")
++            if not math.isfinite(val_legacy) or val_legacy != 0.0:
++                result.errors.append(
++                    "temperature_load_kN_m2: legacy vertical deck patch pressure is unsupported for "
++                    "thermal design; remove it and specify canonical KEY_TL_* thermal parameters."
++                )
++
+         for key in _BASIC_KEYS:
+             if self._is_missing(flat.get(key)) and key != KEY_SKEW_ANGLE:
+                 # Missing basic inputs are not blocked here: the homepage will
+diff --git a/src/osdagbridge/desktop/ui/dialogs/generate_results_values_builder.py b/src/osdagbridge/desktop/ui/dialogs/generate_results_values_builder.py
+index b123192..cbce299 100644
+--- a/src/osdagbridge/desktop/ui/dialogs/generate_results_values_builder.py
++++ b/src/osdagbridge/desktop/ui/dialogs/generate_results_values_builder.py
+@@ -1,3 +1,4 @@
++from collections.abc import Mapping
+ import logging
+ from osdagbridge.core.utils.common import *
+ 
+@@ -1091,10 +1092,11 @@ def resolve_temperature_load_parameters(input_dict: dict, bridge=None) -> dict |
+     thermal_coeff_rcc   = input_dict.get(KEY_TL_THERMAL_COEFF_RCC)   or "12.0e-6"
+ 
+     # ── Computed values — recompute from air temps when absent ─────────────
+-    bridge_temp_min = input_dict.get(KEY_TL_BRIDGE_TEMP_MIN)
+-    bridge_temp_max = input_dict.get(KEY_TL_BRIDGE_TEMP_MAX)
+-    temp_rise       = input_dict.get(KEY_TL_TEMP_RISE)
+-    temp_fall       = input_dict.get(KEY_TL_TEMP_FALL)
++    out_d = (getattr(bridge, "output_dict", None) or {}) if bridge is not None else {}
++    bridge_temp_min = input_dict.get(KEY_TL_BRIDGE_TEMP_MIN) or out_d.get(KEY_TL_BRIDGE_TEMP_MIN)
++    bridge_temp_max = input_dict.get(KEY_TL_BRIDGE_TEMP_MAX) or out_d.get(KEY_TL_BRIDGE_TEMP_MAX)
++    temp_rise       = input_dict.get(KEY_TL_TEMP_RISE)       or out_d.get(KEY_TL_TEMP_RISE)
++    temp_fall       = input_dict.get(KEY_TL_TEMP_FALL)       or out_d.get(KEY_TL_TEMP_FALL)
+ 
+     if (not _has(bridge_temp_min) or not _has(bridge_temp_max)
+             or not _has(temp_rise) or not _has(temp_fall)):
+@@ -2304,6 +2306,45 @@ def resolve_shear_force_by_load_case(input_dict: dict, bridge=None) -> dict | No
+         return None
+ 
+ 
++def resolve_thermal_analysis_summary(input_dict: dict, bridge=None) -> dict | None:
++    """Return solved OpenSeesPy thermal case displacements, forces & equilibrium table."""
++    if bridge is None:
++        return None
++    out_d = getattr(bridge, "output_dict", None) or {}
++    tinfo = out_d.get("thermal_analysis") if isinstance(out_d, Mapping) else None
++    if not isinstance(tinfo, Mapping):
++        return None
++    ssum = tinfo.get("solver_summary") or {}
++    rows = []
++    for lc_name in tinfo.get("load_cases", []):
++        sr = ssum.get(lc_name, {})
++        rows.append([
++            str(lc_name),
++            _num(sr.get("dx_max_mm"), decimals=4) if sr.get("dx_max_mm") is not None else EMPTY,
++            _num(sr.get("dy_mid_max_mm"), decimals=4) if sr.get("dy_mid_max_mm") is not None else EMPTY,
++            _num(sr.get("N_max_kN"), decimals=3) if sr.get("N_max_kN") is not None else EMPTY,
++            _num(sr.get("Mz_max_kNm"), decimals=3) if sr.get("Mz_max_kNm") is not None else EMPTY,
++            _num(sr.get("Rx_sum_kN"), decimals=6) if sr.get("Rx_sum_kN") is not None else EMPTY,
++            _num(sr.get("Ry_sum_kN"), decimals=6) if sr.get("Ry_sum_kN") is not None else EMPTY,
++            _num(sr.get("rx_equilibrium_residual_kN"), decimals=6) if sr.get("rx_equilibrium_residual_kN") is not None else EMPTY,
++        ])
++    return {
++        "id": "thermal_analysis_summary",
++        "label": "Thermal Analysis Summary (IRC:6-2017 Cl. 215)",
++        "columns": [
++            "Load Case",
++            "Max Axial Displacement dx (mm)",
++            "Max Vertical Deflection dy (mm)",
++            "Max Axial Force N (kN)",
++            "Max Bending Moment Mz (kNm)",
++            "Sum Rx (kN)",
++            "Sum Ry (kN)",
++            "Eq. Residual |Sum Rx| (kN)",
++        ],
++        "rows": rows,
++    }
++
++
+ # ── Registry — must be after all resolver definitions ────────────────────────
+ 
+ RESOLVER_MAP: dict[str, callable] = {
+@@ -2323,6 +2364,7 @@ RESOLVER_MAP: dict[str, callable] = {
+     "seismic_load_parameters": resolve_seismic_load_parameters,
+     "wind_load_parameters": resolve_wind_load_parameters,
+     "temperature_load_parameters": resolve_temperature_load_parameters,
++    "thermal_analysis_summary": resolve_thermal_analysis_summary,
+     "load_combinations": resolve_load_combinations,
+ 
+     # ── Analysis Results — Load Effects (Girder) ─────────────────────────────
+diff --git a/src/ospgrillage/__init__.py b/src/ospgrillage/__init__.py
+index 1b92efa..c54ec1b 100644
+--- a/src/ospgrillage/__init__.py
++++ b/src/ospgrillage/__init__.py
+@@ -86,6 +86,7 @@ __all__ = [
+     "LineLoading",
+     "LoadVertex",
+     "LoadPoint",  # deprecated alias for LoadVertex
++    "ThermalElementLoad",
+     "CompoundLoad",
+     "Line",
+     "ShapeFunction",
+diff --git a/src/ospgrillage/load.py b/src/ospgrillage/load.py
+index 59e71c4..e456ddc 100644
+--- a/src/ospgrillage/load.py
++++ b/src/ospgrillage/load.py
+@@ -38,6 +38,7 @@ __all__ = [
+     "LineLoading",
+     "LoadVertex",
+     "LoadPoint",  # deprecated alias for LoadVertex
++    "ThermalElementLoad",
+     "CompoundLoad",
+     "Line",
+     "ShapeFunction",
+@@ -1159,6 +1160,58 @@ class CompoundLoad:
+                 load_obj.apply_load_factor(factor)
+ 
+ 
++class ThermalElementLoad(Loads):
++    """Equivalent nodal thermal action container with per-element local fixed-end vectors.
++
++    Stores precomputed equivalent global nodal force/moment vectors applied to the
++    elastic OpenSeesPy model via ``ops.load()``, together with the element-level
++    fixed-end thermal nodal action vectors (``fth_local`` and ``fth_global``)
++    required during result recovery so reported element forces equal ``K q - f_th``.
++    """
++
++    def __init__(
++        self,
++        name: str,
++        element_fth_local: dict[int, list[float]] | None = None,
++        element_fth_global: dict[int, list[float]] | None = None,
++        nodal_loads_global: dict[int, list[float]] | None = None,
++        metadata: dict | None = None,
++    ):
++        super().__init__(name=name)
++        self.element_fth_local: dict[int, list[float]] = {
++            int(k): [float(x) for x in v] for k, v in (element_fth_local or {}).items()
++        }
++        self.element_fth_global: dict[int, list[float]] = {
++            int(k): [float(x) for x in v] for k, v in (element_fth_global or {}).items()
++        }
++        self.nodal_loads_global: dict[int, list[float]] = {
++            int(k): [float(x) for x in v] for k, v in (nodal_loads_global or {}).items()
++        }
++        self.metadata: dict = dict(metadata or {})
++
++    def apply_load_factor(self, factor=1):
++        """Scale nodal equivalent loads and element fixed-end thermal vectors by *factor*."""
++        f = float(factor)
++        for vec in self.element_fth_local.values():
++            for idx in range(len(vec)):
++                vec[idx] *= f
++        for vec in self.element_fth_global.values():
++            for idx in range(len(vec)):
++                vec[idx] *= f
++        for vec in self.nodal_loads_global.values():
++            for idx in range(len(vec)):
++                vec[idx] *= f
++
++    def get_nodal_load_calls(self) -> list[tuple]:
++        """Return ``('load', (node_tag, Fx, Fy, Fz, Mx, My, Mz), {})`` calls for ``_OpsProxy._dispatch()``."""
++        calls = []
++        for node_tag in sorted(self.nodal_loads_global.keys()):
++            vec = self.nodal_loads_global[node_tag]
++            if any(abs(v) > 0.0 for v in vec):
++                calls.append(("load", (int(node_tag), *[float(v) for v in vec]), {}))
++        return calls
++
++
+ # ---------------------------------------------------------------------------------------------------------------
+ class LoadCase:
+     """
+diff --git a/src/ospgrillage/osp_grillage.py b/src/ospgrillage/osp_grillage.py
+index 20bd0eb..fc05a61 100644
+--- a/src/ospgrillage/osp_grillage.py
++++ b/src/ospgrillage/osp_grillage.py
+@@ -28,6 +28,7 @@ from ospgrillage.load import (
+     PatchLoading,
+     PointLoad,
+     ShapeFunction,
++    ThermalElementLoad,
+ )
+ from ospgrillage.mesh import (
+     BeamLinkMesh,
+@@ -474,6 +475,8 @@ class OspGrillage:
+         self.spring_node_pairs = (
+             {}
+         )  # dict with keys being master node (support) and value being slave node (non-support)
++        self.longitudinal_spring_edges = []
++        self.longitudinal_spring_node_pairs = {}  # {ground_node: (bridge_node, eq_dofs)}
+         self.equal_dof_command_str_list = []  # list to store ops command
+ 
+         # edge support type
+@@ -579,6 +582,9 @@ class OspGrillage:
+ 
+         # write equalDOF commands
+         self._write_equal_dof(node_tag_list=self.spring_node_pairs.items())
++        for ground_node, (bridge_node, eq_dofs) in self.longitudinal_spring_node_pairs.items():
++            if eq_dofs:
++                self._ops.equalDOF(ground_node, bridge_node, *eq_dofs)
+ 
+         # if created OpenSees instance, set instance flag
+         if not self.pyfile:
+@@ -657,19 +663,29 @@ class OspGrillage:
+                 round(float(coordinate[2]), 4),
+             )
+ 
++    def _overhang_edge_beam_zgroups(self) -> set[int]:
++        """Return outermost z_groups only when genuine overhang edge beams exist."""
++        has_edge_beams = (
++            float(getattr(self, "edge_width_a", 0.0) or 0.0) > 0.0
++            or float(getattr(self, "edge_width_b", 0.0) or 0.0) > 0.0
++        )
++        if not has_edge_beams:
++            return set()
++        return set(self.Mesh_obj.common_z_group_element.get(0, []))
++
+     def _write_op_fix(self, mesh_obj):
+         """Write/create fix commands."""
+         if self.pyfile:
+             with open(self.filename, "a") as fh:
+                 fh.write("# Boundary condition implementation\n")
++        skip_zgroups = self._overhang_edge_beam_zgroups()
+         for node_tag, edge_group_num in mesh_obj.edge_node_recorder.items():
+-            if (
+-                mesh_obj.node_spec[node_tag]["z_group"]
+-                in mesh_obj.common_z_group_element[0]
+-            ):
++            if mesh_obj.node_spec[node_tag]["z_group"] in skip_zgroups:
+                 pass
+             else:
+                 self._ops.fix(node_tag, *self.edge_support_type_dict[edge_group_num])
++        for ground_node in self.longitudinal_spring_node_pairs.keys():
++            self._ops.fix(ground_node, 1, 1, 1, 1, 1, 1)
+ 
+     # TODO
+     def _write_mass(self):
+@@ -1143,6 +1159,73 @@ class OspGrillage:
+ 
+         self.element_command_list.update(ele_tag_to_command_dict)
+ 
++    def set_longitudinal_spring_support(
++        self,
++        stiffness_N_per_m: float,
++        edge_num: int = 0,
++        base_restraint: list[int] | None = None,
++    ):
++        """Apply a finite longitudinal translational bearing spring (DOF 1) along *edge_num*.
++
++        Creates a fixed ground node coincident with each supported main-girder
++        node on ``edge_num``, connects them via a uniaxial ``zeroLength`` spring in
++        global DOF 1 with tangent stiffness ``stiffness_N_per_m`` (N/m), and ties
++        the remaining fixed DOFs (e.g. ``[2, 3]`` for Pinned/Roller, ``[2, 3, 4, 5, 6]``
++        for Fixed) via ``equalDOF``. Must be called before ``create_osp_model()``.
++        """
++        stiffness = float(stiffness_N_per_m)
++        if not math.isfinite(stiffness) or stiffness <= 0.0:
++            raise ValueError(
++                f"Longitudinal bearing stiffness must be finite and > 0 N/m, got {stiffness_N_per_m}."
++            )
++        if self.model_instance:
++            raise ValueError(
++                "Model instance already created - call set_longitudinal_spring_support() before create_osp_model()."
++            )
++        if edge_num in self.longitudinal_spring_edges:
++            raise ValueError(f"Longitudinal spring support already defined for edge {edge_num}")
++        self.longitudinal_spring_edges.append(edge_num)
++
++        restraint = list(
++            base_restraint
++            if base_restraint is not None
++            else self.edge_support_type_dict.get(edge_num, [0, 1, 1, 0, 0, 0])
++        )
++        eq_dofs = [d for d in (2, 3, 4, 5, 6) if restraint[d - 1]]
++
++        spring_material = create_material(ops_mat_type="Elastic", E=stiffness)
++        spring_section = create_section(op_ele_type="zeroLength")
++        spring_member = create_member(section=spring_section, material=spring_material)
++        material_tag = self._write_material(member=spring_member)
++
++        edge_beam_zgroups = self._overhang_edge_beam_zgroups()
++        node_tag_list = [
++            key
++            for key, val in self.Mesh_obj.edge_node_recorder.items()
++            if val == edge_num and self.Mesh_obj.node_spec[key]["z_group"] not in edge_beam_zgroups
++        ]
++
++        ele_tag_to_command_dict = {}
++        for node_tag in node_tag_list:
++            spec = self.Mesh_obj.node_spec[node_tag]
++            ground_node = max(self.Mesh_obj.node_spec.keys()) + 1
++            self.Mesh_obj.node_spec[ground_node] = {
++                "tag": ground_node,
++                "coordinate": list(spec["coordinate"]),
++                "x_group": spec["x_group"],
++                "z_group": spec["z_group"],
++            }
++            ele_count = self.global_ele_counter
++            self.global_ele_counter += 1
++            ele_tag_to_command_dict[ele_count] = (
++                f'ops.element("zeroLength",{ele_count},*[{ground_node},{node_tag}],'
++                f'\'-mat\',{material_tag},\'-dir\',1)\n'
++            )
++            del self.Mesh_obj.edge_node_recorder[node_tag]
++            self.longitudinal_spring_node_pairs[ground_node] = (node_tag, eq_dofs)
++
++        self.element_command_list.update(ele_tag_to_command_dict)
++
+     # sub-functions of set_member function
+     @staticmethod
+     def _get_element_command_list(
+@@ -1976,6 +2059,8 @@ class OspGrillage:
+                             )
+                     elif isinstance(nested_list_of_load, PatchLoading):
+                         load_str += self._assign_patch_load(nested_list_of_load)
++                    elif isinstance(nested_list_of_load, ThermalElementLoad):
++                        load_str += nested_list_of_load.get_nodal_load_calls()
+             # else, a single load type, assign it as it is
+             else:
+                 # run single assignment of load type (load_obj is a load class)
+@@ -2012,6 +2097,8 @@ class OspGrillage:
+                         )
+                 elif isinstance(load_obj, PatchLoading):
+                     load_str += self._assign_patch_load(load_obj)
++                elif isinstance(load_obj, ThermalElementLoad):
++                    load_str += load_obj.get_nodal_load_calls()
+ 
+         return load_str
+ 
+@@ -2805,6 +2892,8 @@ class Analysis:
+         self.node_disp = dict()  # key node tag, val list of dof
+         self.node_vel = dict()  # key node tag, val list of dof
+         self.node_accel = dict()  # key node tag, val list of dof
++        self.node_reactions = dict()  # key node tag, val [Fx, Fy, Fz, Mx, My, Mz]
++        self.load_case_factors = []
+         self.ele_force = (
+             dict()
+         )  # key ele tag, val list of forces on nodes of ele[ order according to ele tag]
+@@ -2891,6 +2980,7 @@ class Analysis:
+             "pattern": pattern_command,
+             "load_command": load_str,
+         }
++        self.load_case_factors.append(float(load_factor) if load_factor is not None else 1.0)
+         self.load_cases_dict_list.append(time_series_dict)  # add dict to list
+ 
+     def evaluate_analysis(self):
+@@ -2943,6 +3033,44 @@ class Analysis:
+             self._ops.command_log,
+         )
+ 
++    def _collect_thermal_fixed_end_actions(self):
++        """Sum fixed-end thermal nodal action vectors over all ThermalElementLoad entries in this run."""
++        fth_local: dict[int, list[float]] = {}
++        fth_global: dict[int, list[float]] = {}
++        lc_obj = getattr(self, "load_cases_obj", None)
++        if lc_obj is None:
++            return fth_local, fth_global
++        case_factor = self.load_case_factors[0] if self.load_case_factors else 1.0
++        for entry in getattr(lc_obj, "load_groups", []):
++            load_obj = entry.get("load")
++            entry_factor = entry.get("factor", 1.0)
++            scale = float(1.0 if entry_factor is None else entry_factor) * float(case_factor)
++            if scale == 0.0:
++                continue
++            children = (
++                list(load_obj.compound_load_obj_list)
++                if isinstance(load_obj, CompoundLoad)
++                else [load_obj]
++            )
++            for child in children:
++                if not isinstance(child, ThermalElementLoad):
++                    continue
++                for etag, vec in child.element_fth_local.items():
++                    acc = fth_local.get(etag)
++                    if acc is None:
++                        fth_local[etag] = [scale * float(x) for x in vec]
++                    else:
++                        for i, x in enumerate(vec):
++                            acc[i] += scale * float(x)
++                for etag, vec in child.element_fth_global.items():
++                    acc = fth_global.get(etag)
++                    if acc is None:
++                        fth_global[etag] = [scale * float(x) for x in vec]
++                    else:
++                        for i, x in enumerate(vec):
++                            acc[i] += scale * float(x)
++        return fth_local, fth_global
++
+     # function to extract grillage model responses (dx,dy,dz,rotx,roty,rotz,N,Vy,Vz,Mx,My,Mz) and store to Result class
+     def extract_grillage_responses(self):
+         """
+@@ -2952,21 +3080,33 @@ class Analysis:
+         :returns: None. Results are stored in the ``global_ele_force`` and ``node_disp`` instance variables.
+         """
+         if not self.pyfile:
+-            # first loop extract node displacements
++            ops.reactions()
++            # first loop extract node displacements and support reactions
+             for node_tag in ops.getNodeTags():
+                 disp_list = ops.nodeDisp(node_tag)
+                 vel_list = ops.nodeVel(node_tag)
+                 accel_list = ops.nodeAccel(node_tag)
++                rxn_list = ops.nodeReaction(node_tag)
+                 self.node_disp.setdefault(node_tag, disp_list)
+                 self.node_vel.setdefault(node_tag, vel_list)
+                 self.node_accel.setdefault(node_tag, accel_list)
++                self.node_reactions.setdefault(node_tag, list(rxn_list))
++
++            fth_local, fth_global = self._collect_thermal_fixed_end_actions()
+ 
+-            # loop through all elements in Mesh, extract local forces
++            # loop through all elements in Mesh, extract local/global forces
++            # and subtract equivalent fixed-end thermal actions (K q - f_th)
+             for ele_tag in ops.getEleTags():
+-                ele_force = ops.eleResponse(ele_tag, "localForces")
++                ele_force = list(ops.eleResponse(ele_tag, "localForces"))
++                if ele_tag in fth_local and len(ele_force) == len(fth_local[ele_tag]):
++                    ele_force = [float(a) - float(b) for a, b in zip(ele_force, fth_local[ele_tag])]
+                 self.ele_force.setdefault(ele_tag, ele_force)
+-                global_ele_force = ops.eleResponse(ele_tag, "forces")
++
++                global_ele_force = list(ops.eleResponse(ele_tag, "forces"))
++                if ele_tag in fth_global and len(global_ele_force) == len(fth_global[ele_tag]):
++                    global_ele_force = [float(a) - float(b) for a, b in zip(global_ele_force, fth_global[ele_tag])]
+                 self.global_ele_force.setdefault(ele_tag, global_ele_force)
++
+                 # Shell stress resultants at Gauss points (32 values for
+                 # 4-node shells: 8 per GP × 4 GPs).  Empty for beam elements.
+                 ele_stress = ops.eleResponse(ele_tag, "stresses")
+@@ -2990,8 +3130,11 @@ class Results:
+         self.basic_load_case_record = dict()
+         self.basic_load_case_record_global_forces = dict()
+         self.basic_load_case_record_stresses = dict()  # shell stress resultants
++        self.basic_load_case_record_reactions = dict()  # nodal reactions [Fx,Fy,Fz,Mx,My,Mz]
+         self.moving_load_case_record = []
+         self.moving_load_case_record_global_forces = []
++        self.moving_load_case_record_reactions = []
++        self.reaction_component = ["Fx", "Fy", "Fz", "Mx", "My", "Mz"]
+         self.moving_load_counter = 0
+         self.result = None
+         # store mesh data of holding model
+@@ -3118,7 +3261,8 @@ class Results:
+                 ele_nodes = ops.eleNodes(ele_num)
+                 ele_nodes_dict.update({ele_num: ele_nodes})
+             self.basic_load_case_record.setdefault(
+-                analysis_obj.analysis_name, [node_disp, ele_force_dict, ele_nodes_dict]
++                analysis_obj.analysis_name,
++                [node_disp, node_vel, node_accel, ele_force_dict, ele_nodes_dict],
+             )
+ 
+             # repeat to extract global forces instead
+@@ -3146,6 +3290,10 @@ class Results:
+                 self.basic_load_case_record_stresses.setdefault(
+                     analysis_obj.analysis_name, ele_stress_dict,
+                 )
++            if analysis_obj.node_reactions:
++                self.basic_load_case_record_reactions.setdefault(
++                    analysis_obj.analysis_name, dict(analysis_obj.node_reactions),
++                )
+ 
+         # if moving load, input is a list of analysis obj
+         elif list_of_inc_analysis:
+@@ -3153,6 +3301,7 @@ class Results:
+             inc_load_case_global_force_record = (
+                 dict()
+             )  # inc_load_case_record but with forces in global
++            inc_reaction_record = dict()
+ 
+             for inc_analysis_obj in list_of_inc_analysis:
+                 # compile ele forces for each node
+@@ -3171,7 +3320,7 @@ class Results:
+ 
+                 inc_load_case_record.setdefault(
+                     inc_analysis_obj.analysis_name,
+-                    [node_disp, ele_force_dict, ele_nodes_dict],
++                    [node_disp, node_vel, node_accel, ele_force_dict, ele_nodes_dict],
+                 )
+                 for ele_num, ele_forces in inc_analysis_obj.global_ele_force.items():
+                     ele_force_global_dict.update({ele_num: ele_forces})
+@@ -3185,11 +3334,16 @@ class Results:
+                         ele_nodes_dict,
+                     ],
+                 )
++                if inc_analysis_obj.node_reactions:
++                    inc_reaction_record.setdefault(
++                        inc_analysis_obj.analysis_name, dict(inc_analysis_obj.node_reactions),
++                    )
+ 
+             self.moving_load_case_record.append(inc_load_case_record)
+             self.moving_load_case_record_global_forces.append(
+                 inc_load_case_global_force_record
+             )
++            self.moving_load_case_record_reactions.append(inc_reaction_record)
+ 
+     def compile_data_array(self, local_force_option=True, main_ele_tags=None):
+         """
+@@ -3239,33 +3393,35 @@ class Results:
+ 
+         # loop all basic load case
+         for load_case_name, resp_list_of_2_dict in basic_dict.items():
+-            # extract displacement
++            # extract displacement ordered identically to mesh_obj.node_spec keys
+             basic_node_disp_list.append(
+-                [a for a in list(resp_list_of_2_dict[0].values())]
++                [resp_list_of_2_dict[0].get(nid, [0.0] * 6) for nid in node]
+             )  # list index 0 is disp
+             basic_node_vel_list.append(
+-                [a for a in list(resp_list_of_2_dict[1].values())]
++                [resp_list_of_2_dict[1].get(nid, [0.0] * 6) for nid in node]
+             )
+             basic_node_accel_list.append(
+-                [a for a in list(resp_list_of_2_dict[2].values())]
++                [resp_list_of_2_dict[2].get(nid, [0.0] * 6) for nid in node]
+             )
+             # extract force
+             basic_ele_force_list.append(
+                 [a for a in list(resp_list_of_2_dict[3].values())]
+             )  # list index 1 is force
+-            # extract based on element type
++            # extract based on element type (exclude zeroLength spring tags >= main_ele_tags)
+             base_ele_force_list_beam.append(
+                 [
+                     a
+-                    for a in list(resp_list_of_2_dict[3].values())
+-                    if len(a) == len(self.force_component)
++                    for key, a in resp_list_of_2_dict[3].items()
++                    if a is not None
++                    and len(a) == len(self.force_component)
++                    and (main_ele_tags is None or key < main_ele_tags)
+                 ]
+             )
+             base_ele_force_list_shell.append(
+                 [
+                     a
+                     for a in list(resp_list_of_2_dict[3].values())
+-                    if len(a) == len(self.force_component_shell)
++                    if a is not None and len(a) == len(self.force_component_shell)
+                 ]
+             )
+             if not extracted_ele_nodes_list:
+@@ -3291,13 +3447,13 @@ class Results:
+                 # basic_array_list.append([a + b for (a, b) in zip(list(inc_resp_list_of_2_dict[0].values()),
+                 #                                                       list(inc_resp_list_of_2_dict[1].values()))])
+                 basic_node_disp_list.append(
+-                    [a for a in list(inc_resp_list_of_2_dict[0].values())]
++                    [inc_resp_list_of_2_dict[0].get(nid, [0.0] * 6) for nid in node]
+                 )
+                 basic_node_vel_list.append(
+-                    [a for a in list(inc_resp_list_of_2_dict[1].values())]
++                    [inc_resp_list_of_2_dict[1].get(nid, [0.0] * 6) for nid in node]
+                 )
+                 basic_node_accel_list.append(
+-                    [a for a in list(inc_resp_list_of_2_dict[2].values())]
++                    [inc_resp_list_of_2_dict[2].get(nid, [0.0] * 6) for nid in node]
+                 )
+                 if local_force_option:
+                     basic_ele_force_list.append(
+@@ -3462,25 +3618,39 @@ class Results:
+                 result = xr.Dataset(ds_vars)
+             else:
+                 force_da_beam = xr.DataArray(
+-                    data=force_array,
++                    data=force_array_beam,
+                     dims=self.dim2,
+                     coords={
+                         self.dim2[0]: basic_load_case_coord,
+-                        self.dim2[1]: (
+-                            ele_tag if not local_force_option else ele_tag_beam
+-                        ),
++                        self.dim2[1]: ele_tag_beam,
+                         self.dim2[2]: self.force_component,
+                     },
+                 )
+-                result = xr.Dataset(
+-                    {
+-                        "displacements": basic_da_d,
+-                        "velocity": basic_da_v,
+-                        "acceleration": basic_da_a,
+-                        "forces": force_da_beam,
+-                        "ele_nodes": ele_nodes_beam,
+-                    }
+-                )
++                ds_vars = {
++                    "displacements": basic_da_d,
++                    "velocity": basic_da_v,
++                    "acceleration": basic_da_a,
++                    "forces": force_da_beam,
++                    "ele_nodes": ele_nodes_beam,
++                }
++                if self.basic_load_case_record_reactions or self.moving_load_case_record_reactions:
++                    rxn_lookup = dict(self.basic_load_case_record_reactions)
++                    for inc_rxn in self.moving_load_case_record_reactions:
++                        rxn_lookup.update(inc_rxn)
++                    rxn_rows = [
++                        [rxn_lookup.get(lc_name, {}).get(nid, [0.0] * 6) for nid in node]
++                        for lc_name in basic_load_case_coord
++                    ]
++                    ds_vars["reactions"] = xr.DataArray(
++                        data=np.array(rxn_rows, dtype=float),
++                        dims=["Loadcase", "Node", "ReactionComponent"],
++                        coords={
++                            "Loadcase": basic_load_case_coord,
++                            "Node": node,
++                            "ReactionComponent": self.reaction_component,
++                        },
++                    )
++                result = xr.Dataset(ds_vars)
+ 
+         else:  # no result return None
+             result = None

@@ -1,0 +1,42 @@
+{
+  "commits": {
+    "baseline": "d74f56dd7f22925fb8148cabf5740ed8d1e39ff3",
+    "phase19_anchor": "1196a43",
+    "commit_phase19_conda_refinements": "2794f3e",
+    "commit_issue92_thermal": "370191e",
+    "branch": "phase20-thermal-issue92"
+  },
+  "analytical_oracles": "15/15 PASS",
+  "unit_28_historical_candidate": "28 ran, OK",
+  "unit_bug25_30_baseline": "6 ran, FAILED (failures=6)",
+  "unit_bug25_30_candidate": "6 ran, OK",
+  "issue92_baseline_vs_candidate_test": "1 ran, OK",
+  "gui_issue92_candidate": "7/7",
+  "gui_bug14_adv003_baseline": "2/7 (defect reproduced)",
+  "gui_bug14_adv003_candidate": "7/7",
+  "gui_17fix_revalidation_candidate": "15/15",
+  "issue92_report_pdf_pages": 56,
+  "patches": {
+    "isolated_issue92_bytes": 106600,
+    "isolated_apply_check_on_phase19_commit": "PASS",
+    "combined_all_fixes_bytes": 231168,
+    "combined_apply_check_on_baseline": "PASS"
+  },
+  "phase18_frozen_zip_sha256": "d9ad32cbf8a5d6e0a8e86ec6cbae28135ff2202e71c6a71d9ecff8f2b0cb4308",
+  "phase18_frozen_zip_unchanged": true,
+  "defect_counts": {
+    "fixed_phase16": 17,
+    "fixed_phase19": 6,
+    "fixed_phase20_issue92_scoped": 1,
+    "fixed_total": 24,
+    "resolved_non_defect": 1,
+    "unresolved": 0,
+    "total": 25
+  },
+  "issue92_scope": "Single-span composite plate-girder bridges, |skew| <= 15 deg, longitudinal girder thermal action per IRC:6-2017 Cl. 215. Out of scope: transverse slab expansion across Z-restrained bearings; continuous multi-span bridges.",
+  "notes": [
+    "Main-window Qt grab() cannot capture the OCC OpenGL surface (black area); 3D CAD evidence is the OCC View.Dump image gui_cad_viewport.png (871x676, non-white fraction 0.8337).",
+    "Analytical oracles, 28 unit, 6 Conda and Issue #92 repro were run on the working tree before the commit split; the committed source is byte-identical (analysis_results.py restored and cmp-verified)."
+  ],
+  "remote_writes": 0
+}

@@ -1,0 +1,248 @@
+{
+  "generated_at_utc": "2026-11-20T05:59:06.959264+00:00",
+  "total_benchmarks": 15,
+  "passed": 15,
+  "failed": 0,
+  "benchmarks": [
+    {
+      "id": "BM-01",
+      "name": "Zero Delta-T null state",
+      "expected": 0.0,
+      "actual": 0.0,
+      "abs_error": 0.0,
+      "rel_error": 0.0,
+      "tolerance": "< 1e-12 disp, < 1e-9 force/rxn",
+      "status": "PASS",
+      "details": {
+        "max_u_m": 0.0,
+        "max_f_N": 0.0,
+        "max_r_N": 0.0
+      }
+    },
+    {
+      "id": "BM-02",
+      "name": "Free uniform thermal expansion (Pinned-Roller)",
+      "expected": 0.007200000000000001,
+      "actual": 0.007199999999999998,
+      "abs_error": 2.6020852139652106e-18,
+      "rel_error": 3.614007241618348e-16,
+      "tolerance": "rel < 1e-9, |N| < 1e-4 N",
+      "status": "PASS",
+      "details": {
+        "max_N_N": 2.3283064365386963e-09,
+        "max_Rx_N": 2.3283064365386963e-09
+      }
+    },
+    {
+      "id": "BM-03",
+      "name": "Fully restrained uniform thermal compression (Pinned-Pinned)",
+      "expected": 3360000.0,
+      "actual": 3360000.0000000005,
+      "abs_error": 4.656612873077393e-10,
+      "rel_error": 1.3858966884158905e-16,
+      "tolerance": "rel < 1e-9, max_ux < 1e-12",
+      "status": "PASS",
+      "details": {
+        "max_u_x_m": 0.0,
+        "rx_sum_N": 0.0
+      }
+    },
+    {
+      "id": "BM-04",
+      "name": "Series stiffness with two zeroLength bearing springs",
+      "expected": 86709.67741935485,
+      "actual": 86709.67741935479,
+      "abs_error": 5.820766091346741e-11,
+      "rel_error": 5.801772339669455e-15,
+      "tolerance": "rel < 1e-8",
+      "status": "PASS",
+      "details": {
+        "u_left_act": -0.002167741935483884,
+        "u_right_act": 0.00433548387096773,
+        "rx_sum_N": 1.4551915228366852e-11
+      }
+    },
+    {
+      "id": "BM-05",
+      "name": "Uniform heating vs cooling sign & linear proportionality",
+      "expected": -0.6,
+      "actual": -0.5999999999999998,
+      "abs_error": 2.220446049250313e-16,
+      "rel_error": 3.7007434154171886e-16,
+      "tolerance": "rel < 1e-9",
+      "status": "PASS",
+      "details": {
+        "N_heat_N": 399999.99999999977,
+        "N_cool_N": -239999.99999999977
+      }
+    },
+    {
+      "id": "BM-06",
+      "name": "IRC:6 Cl.215.4 heating gradient upward camber & zero secondary moment",
+      "expected": 0.007561053653871764,
+      "actual": 0.007561053653871795,
+      "abs_error": 3.122502256758253e-17,
+      "rel_error": 4.129718422457329e-15,
+      "tolerance": "rel < 1e-7, |Mz| < 1e-4 Nm",
+      "status": "PASS",
+      "details": {
+        "max_Mz_Nm": 3.841705620288849e-09,
+        "kappa": 0.00010501463408155227
+      }
+    },
+    {
+      "id": "BM-07",
+      "name": "IRC:6 Cl.215.4 cooling gradient downward deflection",
+      "expected": -0.0013114342572589364,
+      "actual": -0.0013114342572589427,
+      "abs_error": 6.288372600415926e-18,
+      "rel_error": 4.7950345704400165e-15,
+      "tolerance": "rel < 1e-7, |Mz| < 1e-4 Nm",
+      "status": "PASS",
+      "details": {
+        "max_Mz_Nm": 6.111804395914078e-10,
+        "kappa": -1.8214364684151894e-05
+      }
+    },
+    {
+      "id": "BM-08",
+      "name": "Composite differential CTE (20e-6 vs 10e-6) uniform-dT thermal bowing",
+      "expected": -0.00024295181652022728,
+      "actual": -0.0002429518165202283,
+      "abs_error": 1.0028870095490916e-18,
+      "rel_error": 4.127925544716373e-15,
+      "tolerance": "rel < 1e-6, res < 1e-4",
+      "status": "PASS",
+      "details": {
+        "res_N": 1.0890587986978062e-08,
+        "res_Nm": -6.625008097671525e-09
+      }
+    },
+    {
+      "id": "BM-09",
+      "name": "Fixed-Fixed restrained thermal curvature bending moment",
+      "expected": 1000000.0,
+      "actual": 1000000.0,
+      "abs_error": 0.0,
+      "rel_error": 0.0,
+      "tolerance": "rel < 1e-7, max_dy < 1e-11",
+      "status": "PASS",
+      "details": {
+        "max_dy_m": 2.2737367544323286e-20
+      }
+    },
+    {
+      "id": "BM-10",
+      "name": "3D support reaction global force & moment equilibrium",
+      "expected": 0.0,
+      "actual": 1.864137190988461e-09,
+      "abs_error": 0.0,
+      "rel_error": 1.864137190988461e-09,
+      "tolerance": "|Sum F| < 1e-6 N, |Sum M| < 1e-5 Nm",
+      "status": "PASS",
+      "details": {
+        "sum_F": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "sum_M": [
+          1.3642420526593924e-12,
+          1.4842953532934189e-09,
+          -1.127773430198431e-09
+        ]
+      }
+    },
+    {
+      "id": "BM-11",
+      "name": "Skew +-15 deg Oblique grillage free thermal expansion & R transform",
+      "expected": 0.0072,
+      "actual": 0.0072,
+      "abs_error": 5.204170427930421e-18,
+      "rel_error": 7.228014483236697e-16,
+      "tolerance": "rel < 1e-7, |N| < 1e-3 N",
+      "status": "PASS",
+      "details": {
+        "orth_err": 1.732836271544193e-17,
+        "max_N_N": 2.7939677238464355e-09
+      }
+    },
+    {
+      "id": "BM-12",
+      "name": "Mesh refinement independence (nt=5, 9, 17)",
+      "expected": [
+        218978.10218978103,
+        0.00864
+      ],
+      "actual": [
+        218978.10218978036,
+        0.008639999999979402
+      ],
+      "abs_error": 5.220525789169862e-07,
+      "rel_error": 2.3840401103875702e-12,
+      "tolerance": "rel < 1e-7",
+      "status": "PASS",
+      "details": {
+        "n_vals": [
+          218978.10218978045,
+          218978.10218978982,
+          218978.10218978036
+        ],
+        "dy_vals": [
+          0.008639999999999905,
+          0.008639999999998562,
+          0.008639999999979402
+        ]
+      }
+    },
+    {
+      "id": "BM-13",
+      "name": "First-principles K*q - f_th local/global element recovery",
+      "expected": 0.0,
+      "actual": 1.3969838619232178e-09,
+      "abs_error": 1.3969838619232178e-09,
+      "rel_error": 5.174014303419326e-16,
+      "tolerance": "< 1e-4 N/Nm",
+      "status": "PASS",
+      "details": {
+        "max_diff_loc": 1.3969838619232178e-09,
+        "max_diff_glob": 1.3969838619232178e-09
+      }
+    },
+    {
+      "id": "BM-14",
+      "name": "Full-bridge (192-element) ULS/SLS thermal superposition & bare-steel SW",
+      "expected": 0.0,
+      "actual": 5.434267222881317e-07,
+      "abs_error": 5.434267222881317e-07,
+      "rel_error": 7.617738623287046e-08,
+      "tolerance": "rel < 1e-6",
+      "status": "PASS",
+      "details": {
+        "elements": 192,
+        "sw_rxn_kN": -187.458942,
+        "expected_sw_kN": 187.458942,
+        "thermal_summary_cases": [
+          "TL_UNIFORM_RISE",
+          "TL_UNIFORM_FALL",
+          "TL_GRADIENT_HEAT",
+          "TL_GRADIENT_COOL",
+          "1.0 TL"
+        ]
+      }
+    },
+    {
+      "id": "BM-15",
+      "name": "Strict scope guards (legacy/skew>15/inverted) & nonthermal invariance",
+      "expected": false,
+      "actual": false,
+      "abs_error": 0.0,
+      "rel_error": 0.0,
+      "tolerance": "guards raise ValueError; nonthermal has 0 TL",
+      "status": "PASS",
+      "details": {
+        "nonthermal_uses_composite": false
+      }
+    }
+  ]
+}

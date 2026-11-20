@@ -1,0 +1,220 @@
+{
+  "repo_file": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/candidate/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py",
+  "assertions": {
+    "gui_design_completed_with_thermal_cases": true,
+    "gui_cad_3d_nonblank": true,
+    "gui_plots_rendered_png": true,
+    "gui_osi_save_and_reload_valid": true,
+    "gui_osi_rejects_legacy_temperature_pressure": true,
+    "gui_report_pdf_compiled_with_thermal_tables": true,
+    "gui_results_builder_tables_populated": true
+  },
+  "artifacts": {
+    "screenshot_temp_tab": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/screenshots/gui_additional_inputs_temp.png",
+    "screenshot_mainwindow": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/screenshots/gui_mainwindow_thermal_design.png",
+    "screenshot_cad_3d": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/screenshots/gui_cad_viewport.png",
+    "plot_1_0_TL_bmd": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/plot_1_0_TL_bmd.png",
+    "plot_1_0_TL_defl": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/plot_1_0_TL_defl.png",
+    "plot_env_uls_bmd": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/plot_env_uls_bmd.png",
+    "saved_osi": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/issue92_thermal_saved.osi",
+    "report_tex": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/report_issue92/issue92_thermal_report.tex",
+    "report_pdf": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/report_issue92/issue92_thermal_report.pdf"
+  },
+  "details": {
+    "design_elapsed_s": 22.68,
+    "cad_info": {
+      "path": "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase20/evidence/gui_issue92/screenshots/gui_cad_viewport.png",
+      "width": 871,
+      "height": 676,
+      "non_white_fraction": 0.8337,
+      "non_blank_full_size": true
+    },
+    "cad_dto_span_mm": 25000.0,
+    "thermal_cases_in_ds": [
+      "TL_UNIFORM_RISE",
+      "TL_UNIFORM_FALL",
+      "TL_GRADIENT_HEAT",
+      "TL_GRADIENT_COOL",
+      "1.0 TL"
+    ],
+    "solver_summary": {
+      "TL_UNIFORM_RISE": {
+        "dx_max_mm": 15.217456,
+        "dy_mid_max_mm": -23.827989,
+        "N_max_kN": 1847.908602,
+        "Mz_max_kNm": 303.862068,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 303.899623,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_UNIFORM_FALL": {
+        "dx_max_mm": -15.217456,
+        "dy_mid_max_mm": 23.827989,
+        "N_max_kN": -1847.908602,
+        "Mz_max_kNm": -303.862068,
+        "Rx_sum_kN": 0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 303.899623,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_HEAT": {
+        "dx_max_mm": 1.758527,
+        "dy_mid_max_mm": 5.761565,
+        "N_max_kN": 213.543989,
+        "Mz_max_kNm": 73.4733,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 35.118586,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_COOL": {
+        "dx_max_mm": -0.319693,
+        "dy_mid_max_mm": -1.118,
+        "N_max_kN": -38.821486,
+        "Mz_max_kNm": 14.257088,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 6.384426,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "1.0 TL": {
+        "dx_max_mm": 16.975983,
+        "dy_mid_max_mm": -18.066424,
+        "N_max_kN": 2061.452591,
+        "Mz_max_kNm": 230.388769,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 339.018209,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      }
+    },
+    "bmd_1_0_tl_summary": {
+      "G1": {
+        "max": 230.389,
+        "min": -0.012
+      },
+      "G2": {
+        "max": 213.208,
+        "min": -0.001
+      },
+      "G3": {
+        "max": 213.208,
+        "min": -0.001
+      },
+      "G4": {
+        "max": 230.389,
+        "min": -0.012
+      }
+    },
+    "defl_1_0_tl_summary": {
+      "G1": {
+        "max": 18.066423876397078,
+        "min": -0.0
+      },
+      "G2": {
+        "max": 18.059683533430874,
+        "min": -0.0
+      },
+      "G3": {
+        "max": 18.059683550400717,
+        "min": -0.0
+      },
+      "G4": {
+        "max": 18.066423926640137,
+        "min": -0.0
+      }
+    },
+    "bmd_env_uls_summary": {
+      "G1": {
+        "max": 3023.132,
+        "min": -0.015
+      },
+      "G2": {
+        "max": 3083.877,
+        "min": -0.002
+      },
+      "G3": {
+        "max": 3083.846,
+        "min": -0.002
+      },
+      "G4": {
+        "max": 3023.039,
+        "min": -0.015
+      }
+    },
+    "pdf_pages": 56,
+    "tbl_tl_row": [
+      65.0,
+      -10.0,
+      2e-05,
+      1e-05,
+      -20.0,
+      80.0,
+      50.0,
+      50.0
+    ],
+    "tbl_sum_rows": [
+      [
+        "TL_UNIFORM_RISE",
+        15.2175,
+        -23.828,
+        1847.909,
+        303.862,
+        -0.0,
+        -0.0,
+        0.0
+      ],
+      [
+        "TL_UNIFORM_FALL",
+        -15.2175,
+        23.828,
+        -1847.909,
+        -303.862,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        "TL_GRADIENT_HEAT",
+        1.7585,
+        5.7616,
+        213.544,
+        73.473,
+        -0.0,
+        0.0,
+        0.0
+      ],
+      [
+        "TL_GRADIENT_COOL",
+        -0.3197,
+        -1.118,
+        -38.821,
+        14.257,
+        -0.0,
+        0.0,
+        0.0
+      ],
+      [
+        "1.0 TL",
+        16.976,
+        -18.0664,
+        2061.453,
+        230.389,
+        -0.0,
+        -0.0,
+        0.0
+      ]
+    ]
+  },
+  "summary": {
+    "assertions_passed": 7,
+    "assertions_total": 7,
+    "all_passed": true
+  }
+}

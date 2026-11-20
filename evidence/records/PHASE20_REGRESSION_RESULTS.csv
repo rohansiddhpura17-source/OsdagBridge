@@ -1,0 +1,60 @@
+suite,test_id,target,status,metric_summary,evidence_file
+analytical_oracles,BM-01,candidate,PASS,Zero Delta-T null state; abs_err=0.0; rel_err=0.0,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-02,candidate,PASS,Free uniform thermal expansion (Pinned-Roller); abs_err=2.6020852139652106e-18; rel_err=3.614007241618348e-16,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-03,candidate,PASS,Fully restrained uniform thermal compression (Pinned-Pinned); abs_err=4.656612873077393e-10; rel_err=1.3858966884158905e-16,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-04,candidate,PASS,Series stiffness with two zeroLength bearing springs; abs_err=5.820766091346741e-11; rel_err=5.801772339669455e-15,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-05,candidate,PASS,Uniform heating vs cooling sign & linear proportionality; abs_err=2.220446049250313e-16; rel_err=3.7007434154171886e-16,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-06,candidate,PASS,IRC:6 Cl.215.4 heating gradient upward camber & zero secondary moment; abs_err=3.122502256758253e-17; rel_err=4.129718422457329e-15,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-07,candidate,PASS,IRC:6 Cl.215.4 cooling gradient downward deflection; abs_err=6.288372600415926e-18; rel_err=4.7950345704400165e-15,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-08,candidate,PASS,Composite differential CTE (20e-6 vs 10e-6) uniform-dT thermal bowing; abs_err=1.0028870095490916e-18; rel_err=4.127925544716373e-15,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-09,candidate,PASS,Fixed-Fixed restrained thermal curvature bending moment; abs_err=0.0; rel_err=0.0,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-10,candidate,PASS,3D support reaction global force & moment equilibrium; abs_err=0.0; rel_err=1.864137190988461e-09,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-11,candidate,PASS,Skew +-15 deg Oblique grillage free thermal expansion & R transform; abs_err=5.204170427930421e-18; rel_err=7.228014483236697e-16,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-12,candidate,PASS,"Mesh refinement independence (nt=5, 9, 17); abs_err=5.220525789169862e-07; rel_err=2.3840401103875702e-12",PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-13,candidate,PASS,First-principles K*q - f_th local/global element recovery; abs_err=1.3969838619232178e-09; rel_err=5.174014303419326e-16,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-14,candidate,PASS,Full-bridge (192-element) ULS/SLS thermal superposition & bare-steel SW; abs_err=5.434267222881317e-07; rel_err=7.617738623287046e-08,PHASE20_ANALYTICAL_ORACLES.json
+analytical_oracles,BM-15,candidate,PASS,Strict scope guards (legacy/skew>15/inverted) & nonthermal invariance; abs_err=0.0; rel_err=0.0,PHASE20_ANALYTICAL_ORACLES.json
+unit_28_historical,28 tests,candidate,PASS,Ran 28 in 2.059s,phase20_28unit_candidate.log
+unit_bug25_30_conda,6 tests,baseline,FAIL (expected),Ran 6; FAILED (failures=6),phase20_bug25_to_30_baseline.log
+unit_bug25_30_conda,6 tests,candidate,PASS,Ran 6 in 0.823s,phase20_bug25_to_30_candidate.log
+issue92_repro,Case A vs B,baseline,DEFECT REPRODUCED,A=1633.8066 kNm == B=1633.8066 kNm; thermal_cases=[],PHASE20_ISSUE92_BASELINE_VS_CANDIDATE.json
+issue92_repro,Case C legacy,baseline,DEFECT REPRODUCED,spurious vertical 1.0 TL Mz=277.2194 kNm dy=10.8407 mm,PHASE20_ISSUE92_BASELINE_VS_CANDIDATE.json
+issue92_repro,Case A vs B,candidate,PASS,A=3071.6366 kNm != B=2809.8823 kNm; 5 TL cases,PHASE20_ISSUE92_BASELINE_VS_CANDIDATE.json
+issue92_repro,Case C legacy,candidate,PASS,ValueError raised,PHASE20_ISSUE92_BASELINE_VS_CANDIDATE.json
+issue92_repro,Case D nonthermal,candidate,PASS,thermal_cases=[]; composite=False,PHASE20_ISSUE92_BASELINE_VS_CANDIDATE.json
+gui_issue92,gui_design_completed_with_thermal_cases,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_cad_3d_nonblank,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_plots_rendered_png,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_osi_save_and_reload_valid,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_osi_rejects_legacy_temperature_pressure,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_report_pdf_compiled_with_thermal_tables,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_issue92,gui_results_builder_tables_populated,candidate,PASS,,gui_issue92/phase20_issue92_gui_summary.json
+gui_bug14_adv003,BUG14_no_unrelated_mutations_opt_to_custom,baseline,FAIL,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,BUG14_cb_area_unit_m2_preserved,baseline,PASS,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,BUG14_no_unrelated_mutations_custom_to_opt,baseline,FAIL,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,BUG14_no_stale_stiffeners_after_return,baseline,FAIL,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,ADV003_zero_stale_input_keys_29_to_3,baseline,FAIL,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,ADV003_zero_stale_output_keys_29_to_3,baseline,FAIL,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,ADV003_design_pairs_and_type_ok,baseline,PASS,,gui_bug14/bug14_adv003_gui_baseline.json
+gui_bug14_adv003,BUG14_no_unrelated_mutations_opt_to_custom,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,BUG14_cb_area_unit_m2_preserved,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,BUG14_no_unrelated_mutations_custom_to_opt,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,BUG14_no_stale_stiffeners_after_return,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,ADV003_zero_stale_input_keys_29_to_3,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,ADV003_zero_stale_output_keys_29_to_3,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_bug14_adv003,ADV003_design_pairs_and_type_ok,candidate,PASS,,gui_bug14/bug14_adv003_gui_candidate.json
+gui_17fix_revalidation,BUG13_3G_mapping_and_alignment,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG01_Ecm_MPa_and_preserved_wk_failure,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG02_concrete_excel_units,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG10_CAD_nonblank_run1,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG08_30_32_30_zero_stale,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG10_CAD_nonblank_32_30,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG13_4G_mapping_and_alignment,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG11_tectonic_4g_pdf_clean,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG09_4G_to_3G_zero_stale_keys,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG12_custom_osi_priming_12_of_12,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG03_G_precision_76.923,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG04_custom_steel_density_SW_scaling,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG05_custom_deck_density_DD_scaling,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG06_CB_ED_custom_effective,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json
+gui_17fix_revalidation,BUG07_GUI_OSI_nonfinite_rejected,candidate,PASS,,gui_17fix/candidate_17fix_live_revalidation.json

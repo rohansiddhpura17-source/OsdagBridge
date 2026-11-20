@@ -1,0 +1,156 @@
+{
+  "target": "candidate",
+  "source": "/Volumes/OsdagBridgeEnv/worktrees/phase89-fixes/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py",
+  "loadcase_count": 48,
+  "element_count": 192,
+  "node_count": 108,
+  "canonical_thermal_inputs_present": true,
+  "thermal_loadcase_present": false,
+  "superposition": {
+    "BASIC_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 4.745088517665863e-07,
+        "mismatch_cells": 0
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 1.0852430065710905e-14,
+        "mismatch_cells": 0
+      }
+    },
+    "SLS_RARE_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 3.364402800798416e-07,
+        "mismatch_cells": 0
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 7.854827899222983e-15,
+        "mismatch_cells": 0
+      }
+    },
+    "SEISMIC_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 3.026798367500305e-07,
+        "mismatch_cells": 0
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 6.356026815979021e-15,
+        "mismatch_cells": 0
+      }
+    },
+    "SEISMIC_2": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 2.0279549062252045e-07,
+        "mismatch_cells": 0
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 4.253541963095131e-15,
+        "mismatch_cells": 0
+      }
+    }
+  },
+  "envelopes": {
+    "Envelope ULS": {
+      "group_count": 13,
+      "loadcases": [
+        "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL",
+        "BASIC_2: 1.35DL + 1.75DW + 1.15LL + 1.5WL",
+        "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL",
+        "BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL",
+        "BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL",
+        "BASIC_6: 1.0DL + 1.0DW + 1.15LL + 0.9WL",
+        "ACCIDENTAL_1: 1.0DL + 1.0DW + 0.75LL",
+        "ACCIDENTAL_2: 1.0DL + 1.0DW + 0.75LL",
+        "ACCIDENTAL_3: 1.0DL + 1.0DW + 0.75LL",
+        "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL",
+        "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL",
+        "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL",
+        "SEISMIC_4: 1.0DL + 1.0DW + 0.2LL + 0.75EL"
+      ],
+      "variables": {
+        "forces": {
+          "cells": 2304,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL": 988,
+            "BASIC_2: 1.35DL + 1.75DW + 1.15LL + 1.5WL": 83,
+            "BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL": 128,
+            "BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL": 22,
+            "BASIC_6: 1.0DL + 1.0DW + 1.15LL + 0.9WL": 2,
+            "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL": 790,
+            "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL": 40,
+            "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL": 251
+          }
+        },
+        "displacements": {
+          "cells": 648,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL": 322,
+            "BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL": 2,
+            "BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL": 7,
+            "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL": 264,
+            "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL": 12,
+            "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL": 41
+          }
+        }
+      }
+    },
+    "Envelope SLS": {
+      "group_count": 14,
+      "loadcases": [
+        "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL",
+        "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL",
+        "SLS_RARE_3: 1.0DL + 1.2DW + 0.75LL + 0.6WL",
+        "SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL",
+        "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL",
+        "SLS_RARE_6: 1.0DL + 1.0DW + 0.75LL + 0.6WL",
+        "SLS_FREQUENT_1: 1.0DL + 1.2DW + 0.75LL + 0.5WL",
+        "SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL",
+        "SLS_FREQUENT_3: 1.0DL + 1.2DW + 0.2LL + 0.5WL",
+        "SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL",
+        "SLS_FREQUENT_5: 1.0DL + 1.0DW + 0.2LL + 0.6WL",
+        "SLS_FREQUENT_6: 1.0DL + 1.0DW + 0.2LL + 0.5WL",
+        "SLS_QP_1: 1.0DL + 1.2DW",
+        "SLS_QP_2: 1.0DL + 1.0DW"
+      ],
+      "variables": {
+        "forces": {
+          "cells": 2304,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL": 990,
+            "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL": 738,
+            "SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL": 116,
+            "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL": 406,
+            "SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL": 4,
+            "SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL": 2,
+            "SLS_QP_1: 1.0DL + 1.2DW": 48
+          }
+        },
+        "displacements": {
+          "cells": 648,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL": 322,
+            "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL": 223,
+            "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL": 89,
+            "SLS_QP_1: 1.0DL + 1.2DW": 14
+          }
+        }
+      }
+    }
+  },
+  "all_candidate_oracle_checks_pass": true
+}

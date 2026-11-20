@@ -1,0 +1,266 @@
+{
+  "generated_at_utc": "2026-11-20T06:12:01.371978+00:00",
+  "baseline_case_a_issue92": {
+    "status": "OK",
+    "thermal_cases": [],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL",
+    "envelope_uls_max_Mz_kNm": 1633.8066,
+    "envelope_sls_max_dy_mm": 58.9087,
+    "tl_10_max_dy_mm": null,
+    "tl_10_max_mz_kNm": null,
+    "uses_composite_sections": false,
+    "solver_summary": null
+  },
+  "baseline_case_b_comparison": {
+    "status": "OK",
+    "thermal_cases": [],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL",
+    "envelope_uls_max_Mz_kNm": 1633.8066,
+    "envelope_sls_max_dy_mm": 58.9087,
+    "tl_10_max_dy_mm": null,
+    "tl_10_max_mz_kNm": null,
+    "uses_composite_sections": false,
+    "solver_summary": null
+  },
+  "baseline_case_c_legacy_pressure": {
+    "status": "OK",
+    "thermal_cases": [
+      "1.0 TL"
+    ],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL + 1.5TL",
+    "envelope_uls_max_Mz_kNm": 1909.8771,
+    "envelope_sls_max_dy_mm": 69.7495,
+    "tl_10_max_dy_mm": 10.8407,
+    "tl_10_max_mz_kNm": 277.2194,
+    "uses_composite_sections": false,
+    "solver_summary": null
+  },
+  "candidate_case_a_issue92": {
+    "status": "OK",
+    "thermal_cases": [
+      "TL_UNIFORM_RISE",
+      "TL_UNIFORM_FALL",
+      "TL_GRADIENT_HEAT",
+      "TL_GRADIENT_COOL",
+      "1.0 TL"
+    ],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL + 1.5TL",
+    "envelope_uls_max_Mz_kNm": 3071.6366,
+    "envelope_sls_max_dy_mm": 17.347,
+    "tl_10_max_dy_mm": 18.0713,
+    "tl_10_max_mz_kNm": 395.8379,
+    "uses_composite_sections": true,
+    "solver_summary": {
+      "TL_UNIFORM_RISE": {
+        "dx_max_mm": 15.217423,
+        "dy_mid_max_mm": -23.82887,
+        "N_max_kN": 1847.132512,
+        "Mz_max_kNm": -303.803783,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 303.919429,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_UNIFORM_FALL": {
+        "dx_max_mm": -15.217423,
+        "dy_mid_max_mm": 23.82887,
+        "N_max_kN": -1847.132512,
+        "Mz_max_kNm": 303.803783,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 303.919429,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_HEAT": {
+        "dx_max_mm": 1.758523,
+        "dy_mid_max_mm": 5.761778,
+        "N_max_kN": 213.454304,
+        "Mz_max_kNm": 73.459206,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 35.120875,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_COOL": {
+        "dx_max_mm": -0.319693,
+        "dy_mid_max_mm": -1.118041,
+        "N_max_kN": -38.805182,
+        "Mz_max_kNm": -14.254353,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 6.384842,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "1.0 TL": {
+        "dx_max_mm": 16.975945,
+        "dy_mid_max_mm": -18.067092,
+        "N_max_kN": 2060.586817,
+        "Mz_max_kNm": -230.344576,
+        "Rx_sum_kN": 0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 339.040304,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      }
+    }
+  },
+  "candidate_case_b_comparison": {
+    "status": "OK",
+    "thermal_cases": [
+      "TL_UNIFORM_RISE",
+      "TL_UNIFORM_FALL",
+      "TL_GRADIENT_HEAT",
+      "TL_GRADIENT_COOL",
+      "1.0 TL"
+    ],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL + 1.5TL",
+    "envelope_uls_max_Mz_kNm": 2809.8823,
+    "envelope_sls_max_dy_mm": 32.2265,
+    "tl_10_max_dy_mm": 6.7429,
+    "tl_10_max_mz_kNm": 147.6969,
+    "uses_composite_sections": true,
+    "solver_summary": {
+      "TL_UNIFORM_RISE": {
+        "dx_max_mm": 9.404376,
+        "dy_mid_max_mm": 0.0,
+        "N_max_kN": 1141.528992,
+        "Mz_max_kNm": -0.0,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 187.822388,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_UNIFORM_FALL": {
+        "dx_max_mm": -9.404376,
+        "dy_mid_max_mm": -0.0,
+        "N_max_kN": -1141.528992,
+        "Mz_max_kNm": 0.0,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 187.822388,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_HEAT": {
+        "dx_max_mm": 2.057472,
+        "dy_mid_max_mm": 6.74128,
+        "N_max_kN": 249.741536,
+        "Mz_max_kNm": 85.947272,
+        "Rx_sum_kN": -0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 41.091424,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "TL_GRADIENT_COOL": {
+        "dx_max_mm": -0.374041,
+        "dy_mid_max_mm": -1.308108,
+        "N_max_kN": -45.402063,
+        "Mz_max_kNm": -16.677593,
+        "Rx_sum_kN": 0.0,
+        "Ry_sum_kN": 0.0,
+        "Rx_abs_max_node_kN": 7.470265,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      },
+      "1.0 TL": {
+        "dx_max_mm": 11.461848,
+        "dy_mid_max_mm": 6.74128,
+        "N_max_kN": 1391.270529,
+        "Mz_max_kNm": 85.947272,
+        "Rx_sum_kN": 0.0,
+        "Ry_sum_kN": -0.0,
+        "Rx_abs_max_node_kN": 228.913812,
+        "rx_equilibrium_residual_kN": 0.0,
+        "ry_equilibrium_residual_kN": 0.0
+      }
+    }
+  },
+  "candidate_case_c_legacy_pressure": {
+    "status": "RAISED",
+    "exc_type": "ValueError",
+    "exc_msg": "Legacy 'temperature_load_kN_m2' represents vertical deck patch pressure, not physical thermal eigenstrain. Remove 'temperature_load_kN_m2' and supply canonical Temperature Load keys (KEY_TL_*) instead."
+  },
+  "candidate_case_d_nonthermal": {
+    "status": "OK",
+    "thermal_cases": [],
+    "basic3_name": "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL",
+    "envelope_uls_max_Mz_kNm": 2278.2276,
+    "envelope_sls_max_dy_mm": 60.6088,
+    "tl_10_max_dy_mm": null,
+    "tl_10_max_mz_kNm": null,
+    "uses_composite_sections": false,
+    "solver_summary": null
+  },
+  "downstream_verification": {
+    "chap3_contains_cte": true,
+    "chap4_contains_thermal_summary": true,
+    "results_builder_tl_row": [
+      65.0,
+      -10.0,
+      2e-05,
+      1e-05,
+      -20.0,
+      80.0,
+      50.0,
+      50.0
+    ],
+    "results_builder_summary_rows": [
+      [
+        "TL_UNIFORM_RISE",
+        15.2174,
+        -23.8289,
+        1847.133,
+        -303.804,
+        -0.0,
+        -0.0,
+        0.0
+      ],
+      [
+        "TL_UNIFORM_FALL",
+        -15.2174,
+        23.8289,
+        -1847.133,
+        303.804,
+        -0.0,
+        -0.0,
+        0.0
+      ],
+      [
+        "TL_GRADIENT_HEAT",
+        1.7585,
+        5.7618,
+        213.454,
+        73.459,
+        -0.0,
+        0.0,
+        0.0
+      ],
+      [
+        "TL_GRADIENT_COOL",
+        -0.3197,
+        -1.118,
+        -38.805,
+        -14.254,
+        -0.0,
+        0.0,
+        0.0
+      ],
+      [
+        "1.0 TL",
+        16.9759,
+        -18.0671,
+        2060.587,
+        -230.345,
+        0.0,
+        -0.0,
+        0.0
+      ]
+    ]
+  }
+}

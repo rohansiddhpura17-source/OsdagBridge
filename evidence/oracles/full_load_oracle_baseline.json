@@ -1,0 +1,179 @@
+{
+  "target": "baseline",
+  "source": "/Volumes/OsdagBridgeEnv/OsdagBridge/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py",
+  "loadcase_count": 48,
+  "element_count": 192,
+  "node_count": 108,
+  "canonical_thermal_inputs_present": true,
+  "thermal_loadcase_present": false,
+  "superposition": {
+    "BASIC_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 739600.4538059067,
+        "mismatch_cells": 2220
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 0.027920350571413358,
+        "mismatch_cells": 506
+      }
+    },
+    "SLS_RARE_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 57359.08697533002,
+        "mismatch_cells": 2196
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 0.002242114580528788,
+        "mismatch_cells": 548
+      }
+    },
+    "SEISMIC_1": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 256261.92715024156,
+        "mismatch_cells": 2220
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 0.007592993414293349,
+        "mismatch_cells": 625
+      }
+    },
+    "SEISMIC_2": {
+      "forces": {
+        "finite_cells": 2304,
+        "max_abs_error": 197243.0719001128,
+        "mismatch_cells": 2220
+      },
+      "displacements": {
+        "finite_cells": 648,
+        "max_abs_error": 0.005130086240693228,
+        "mismatch_cells": 621
+      }
+    }
+  },
+  "envelopes": {
+    "Envelope ULS": {
+      "group_count": 13,
+      "loadcases": [
+        "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL",
+        "BASIC_2: 1.35DL + 1.75DW + 1.15LL + 1.5WL",
+        "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL",
+        "BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL",
+        "BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL",
+        "BASIC_6: 1.0DL + 1.0DW + 1.15LL + 0.9WL",
+        "ACCIDENTAL_1: 1.0DL + 1.0DW + 0.75LL",
+        "ACCIDENTAL_2: 1.0DL + 1.0DW + 0.75LL",
+        "ACCIDENTAL_3: 1.0DL + 1.0DW + 0.75LL",
+        "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL",
+        "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL",
+        "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL",
+        "SEISMIC_4: 1.0DL + 1.0DW + 0.2LL + 0.75EL"
+      ],
+      "variables": {
+        "forces": {
+          "cells": 2304,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL": 82,
+            "BASIC_2: 1.35DL + 1.75DW + 1.15LL + 1.5WL": 24,
+            "BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL": 4,
+            "BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL": 11,
+            "BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL": 4,
+            "BASIC_6: 1.0DL + 1.0DW + 1.15LL + 0.9WL": 4,
+            "ACCIDENTAL_1: 1.0DL + 1.0DW + 0.75LL": 408,
+            "ACCIDENTAL_2: 1.0DL + 1.0DW + 0.75LL": 325,
+            "ACCIDENTAL_3: 1.0DL + 1.0DW + 0.75LL": 223,
+            "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL": 873,
+            "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL": 179,
+            "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL": 85,
+            "SEISMIC_4: 1.0DL + 1.0DW + 0.2LL + 0.75EL": 82
+          }
+        },
+        "displacements": {
+          "cells": 648,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL": 26,
+            "ACCIDENTAL_1: 1.0DL + 1.0DW + 0.75LL": 159,
+            "ACCIDENTAL_2: 1.0DL + 1.0DW + 0.75LL": 146,
+            "ACCIDENTAL_3: 1.0DL + 1.0DW + 0.75LL": 9,
+            "SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL": 262,
+            "SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL": 35,
+            "SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL": 1,
+            "SEISMIC_4: 1.0DL + 1.0DW + 0.2LL + 0.75EL": 10
+          }
+        }
+      }
+    },
+    "Envelope SLS": {
+      "group_count": 14,
+      "loadcases": [
+        "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL",
+        "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL",
+        "SLS_RARE_3: 1.0DL + 1.2DW + 0.75LL + 0.6WL",
+        "SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL",
+        "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL",
+        "SLS_RARE_6: 1.0DL + 1.0DW + 0.75LL + 0.6WL",
+        "SLS_FREQUENT_1: 1.0DL + 1.2DW + 0.75LL + 0.5WL",
+        "SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL",
+        "SLS_FREQUENT_3: 1.0DL + 1.2DW + 0.2LL + 0.5WL",
+        "SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL",
+        "SLS_FREQUENT_5: 1.0DL + 1.0DW + 0.2LL + 0.6WL",
+        "SLS_FREQUENT_6: 1.0DL + 1.0DW + 0.2LL + 0.5WL",
+        "SLS_QP_1: 1.0DL + 1.2DW",
+        "SLS_QP_2: 1.0DL + 1.0DW"
+      ],
+      "variables": {
+        "forces": {
+          "cells": 2304,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL": 667,
+            "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL": 474,
+            "SLS_RARE_3: 1.0DL + 1.2DW + 0.75LL + 0.6WL": 257,
+            "SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL": 167,
+            "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL": 94,
+            "SLS_RARE_6: 1.0DL + 1.0DW + 0.75LL + 0.6WL": 151,
+            "SLS_FREQUENT_1: 1.0DL + 1.2DW + 0.75LL + 0.5WL": 123,
+            "SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL": 132,
+            "SLS_FREQUENT_3: 1.0DL + 1.2DW + 0.2LL + 0.5WL": 39,
+            "SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL": 19,
+            "SLS_FREQUENT_5: 1.0DL + 1.0DW + 0.2LL + 0.6WL": 38,
+            "SLS_FREQUENT_6: 1.0DL + 1.0DW + 0.2LL + 0.5WL": 39,
+            "SLS_QP_1: 1.0DL + 1.2DW": 84,
+            "SLS_QP_2: 1.0DL + 1.0DW": 20
+          }
+        },
+        "displacements": {
+          "cells": 648,
+          "max_abs_error": 0.0,
+          "mismatch_cells": 0,
+          "governing_cell_counts": {
+            "SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL": 216,
+            "SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL": 131,
+            "SLS_RARE_3: 1.0DL + 1.2DW + 0.75LL + 0.6WL": 125,
+            "SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL": 15,
+            "SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL": 17,
+            "SLS_RARE_6: 1.0DL + 1.0DW + 0.75LL + 0.6WL": 18,
+            "SLS_FREQUENT_1: 1.0DL + 1.2DW + 0.75LL + 0.5WL": 53,
+            "SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL": 52,
+            "SLS_FREQUENT_3: 1.0DL + 1.2DW + 0.2LL + 0.5WL": 2,
+            "SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL": 2,
+            "SLS_FREQUENT_6: 1.0DL + 1.0DW + 0.2LL + 0.5WL": 3,
+            "SLS_QP_1: 1.0DL + 1.2DW": 7,
+            "SLS_QP_2: 1.0DL + 1.0DW": 7
+          }
+        }
+      }
+    }
+  },
+  "all_candidate_oracle_checks_pass": false
+}
