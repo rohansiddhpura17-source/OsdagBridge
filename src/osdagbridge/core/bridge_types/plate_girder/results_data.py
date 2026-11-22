@@ -10,6 +10,7 @@ bridge-wrapper dependency.
 
 from __future__ import annotations
 import json
+from math import isfinite
 from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
@@ -952,32 +953,22 @@ def build_forces_summary(result_handler, load_effects_cache: dict) -> dict:
             "sf_location": sf_location,
         }
 
-        # ── 3. Reactions — sum Ra and Rb across all interior girders ──
-        left_total  = 0.0
-        right_total = 0.0
-
-        for gmap_key in cache_label_to_gmap_key.values():
-            element_map = g_map[gmap_key].get("element_map", [])
-            if not element_map:
-                continue
-            eid_start, n1_start, _ = element_map[0]
-            eid_end,   _,  n2_end  = element_map[-1]
-            try:
-                ra = float(ds.sel(
-                    Loadcase=lc, Element=eid_start, Component="Vy_i"
-                )["forces"]) / 1000.0
-                rb = -float(ds.sel(
-                    Loadcase=lc, Element=eid_end, Component="Vy_j"
-                )["forces"]) / 1000.0
-                left_total  += ra
-                right_total += rb
-            except Exception:
-                pass
-
-        rxn_summary[lc] = {
-            "left_kN":  round(left_total,  3),
-            "right_kN": round(right_total, 3),
-        }
+        # Member end shears omit transverse load transfer and loads applied
+        # directly to bearings. Use simultaneous signed OpenSees nodal Fy.
+        if "reactions" in ds and not str(lc).startswith("Envelope"):
+            fy = ds.reactions.sel(Loadcase=lc, ReactionComponent="Fy") / 1000
+            totals = {}
+            for key, end in (("left_kN", "start"), ("right_kN", "end")):
+                node_ids = sorted({line[end] for line in g_map.values()})
+                total = float(fy.sel(Node=node_ids).sum(skipna=False))
+                if isfinite(total):
+                    totals[key] = round(total, 3)
+            # Some bearing models place reactions on auxiliary nodes.
+            # Withhold end totals if these nodes carry vertical reactions.
+            ends = {line[end] for line in g_map.values() for end in ("start", "end")}
+            others = [n for n in fy.Node.values if n not in ends]
+            if len(totals) == 2 and (not others or float(abs(fy.sel(Node=others)).max()) < 1e-6):
+                rxn_summary[lc] = totals
 
     return {"load_cases": lc_summary, "reactions": rxn_summary}
 

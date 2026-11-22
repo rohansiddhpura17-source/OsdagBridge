@@ -1,0 +1,104 @@
+{
+  "case": {
+    "name": "default_3g_plus5deg_overhang",
+    "girders": 3,
+    "skew": 5.0,
+    "density": 78.5
+  },
+  "rho": 78500.0,
+  "physical": [
+    "G1",
+    "G2",
+    "G3"
+  ],
+  "sw_line_kN_m": [
+    1.87458942,
+    1.87458942,
+    1.87458942
+  ],
+  "expected_sw_kN": 140.5942065,
+  "sw_reactions_kN": {
+    "EB1": [
+      5.802576197311282e-13,
+      -3.910827217623591e-14
+    ],
+    "G1": [
+      -34.41132563552518,
+      -34.65928559045654
+    ],
+    "G2": [
+      -0.3251386988126069,
+      -0.971607821790396
+    ],
+    "G3": [
+      -33.48966055049686,
+      -34.64612033437537
+    ],
+    "EB2": [
+      9.822542779147625e-14,
+      1.1195879778824747e-12
+    ]
+  },
+  "sum_Fy_kN": -138.50313863155063,
+  "residual_kN": -2.091067868449386,
+  "report_sw_reactions": {
+    "left_kN": -68.226,
+    "right_kN": -70.277
+  },
+  "sw_peak_kNm": {
+    "EB1": 87.83650127685196,
+    "G1": 87.48297482868493,
+    "G2": 87.08543559391521,
+    "G3": 87.43233371889546,
+    "EB2": 87.76118336126035
+  },
+  "simple_span_kNm": [
+    146.4522984375,
+    146.4522984375,
+    146.4522984375
+  ],
+  "envelope": {
+    "max_bm": 2740.639,
+    "bm_girder": "G2",
+    "bm_location": 12.864,
+    "max_sf": 570.841,
+    "sf_girder": "G1",
+    "sf_location": -0.122
+  },
+  "warnings": {
+    "UserWarning: No footpath component in layout; skipping footpath load creation": 1,
+    "UserWarning: No railing component in layout; skipping railing load creation": 1,
+    "UserWarning: No median component in layout; skipping median load creation": 1,
+    "UserWarning: BASIC_1: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: BASIC_2: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: BASIC_3: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: BASIC_4: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: BASIC_5: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: BASIC_6: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: ACCIDENTAL_1: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: ACCIDENTAL_2: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: ACCIDENTAL_3: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: SEISMIC_1: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: SEISMIC_2: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: SEISMIC_3: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: SEISMIC_4: 'thermal_load' load case not available \u2014 create it before calling create_uls_combinations().": 1,
+    "UserWarning: SLS_RARE_1: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_RARE_2: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_RARE_3: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_RARE_4: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_RARE_5: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_RARE_6: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_1: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_2: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_3: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_4: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_5: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_FREQUENT_6: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_QP_1: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1,
+    "UserWarning: SLS_QP_2: 'thermal_load' load case not available \u2014 create it before calling create_sls_combinations().": 1
+  },
+  "hybr": {},
+  "applied_Fy_kN": 138.50313863155043,
+  "force_balance_kN": -1.9895196601282805e-13,
+  "moment_balance_about_z_kNm": -4.547473508864641e-13
+}

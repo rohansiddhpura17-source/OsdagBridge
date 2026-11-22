@@ -451,8 +451,7 @@ class BridgeGrillageModel:
 
         DL_self_weight = og.create_load_case(name="SW")
 
-        # iterate through all grillage transverse positions (except extreme edges)
-        for z_pos in model.Mesh_obj.noz[1:-1]:
+        for z_pos in main_z_sorted:
             A_girder_m2 = _area_for_z(z_pos)
             beam_mag = girder_self_weight_kN_m(A_girder_m2, rho_s) * kN / m  # N/m
             print(f"Self weight line load @ z={z_pos:.3f} m: {beam_mag:.2f} N/m (A={A_girder_m2:.5f} m²)")

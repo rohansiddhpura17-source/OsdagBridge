@@ -546,22 +546,29 @@ def solve_zeta_eta(xp, zp, x1, z1, x2, z2, x3, z3, x4, z4):
         )
         return eta, zeta
 
-    # if initial xp zp is very close (order 1e-8) to the centre (0,0,0) of natural coordinate,
-    # avoid fsolve RunTimeWarning by
-    if all([np.isclose(xp, (x1 + x2) / 2), np.isclose(zp, (z1 + z3) / 2)]):
-        root_func = [0, 0]
+    # In an oblique grillage the opposite longitudinal sides have constant z.
+    # Recover the transverse fraction directly, then interpolate the two
+    # side coordinates to invert x. Corner numbering may be rotated.
+    if z1 == z2 and z3 == z4 and z1 != z4:
+        v = (zp - z1) / (z4 - z1)
+        left = x1 + v * (x4 - x1)
+        width = x2 + v * (x3 - x2) - left
+        if width:
+            return 2 * (xp - left) / width - 1, 2 * v - 1
+    elif z1 == z4 and z2 == z3 and z1 != z2:
+        u = (zp - z1) / (z2 - z1)
+        left = x1 + u * (x2 - x1)
+        width = x4 + u * (x3 - x4) - left
+        if width:
+            return 2 * u - 1, 2 * (xp - left) / width - 1
 
-    else:
-        root_func = fsolve(
-            obj_func,
-            np.array([-0.4444444444444, 0.99999999]),
-            args=(xp, zp, x1, x2, x3, x4, z1, z2, z3, z4),
-        )  # here the initial values are chosen to avoid RunTimeWarning where initial guess is very close
-        # to the final solution of eta and zeta
-
-    eta = root_func[0]
-    zeta = root_func[1]
-    return eta, zeta
+    args = (xp, zp, x1, x2, x3, x4, z1, z2, z3, z4)
+    coords, info, status, message = fsolve(obj_func, [0., 0.], args=args, full_output=True)
+    residual = np.linalg.norm(info["fvec"], ord=np.inf) / 4
+    size = max(np.ptp([x1,x2,x3,x4]), np.ptp([z1,z2,z3,z4]))
+    if status != 1 or not np.isfinite(residual) or residual > 1e-9 * size:
+        raise ValueError(f"Cannot invert quadrilateral at ({xp}, {zp}): {message}, residual={residual}")
+    return tuple(coords)
 
 
 def get_distance(a, b):
