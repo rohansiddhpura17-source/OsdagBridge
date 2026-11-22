@@ -1,0 +1,12 @@
+test_bug25_irc22_table2_i_rolled_case_insensitive_real_osdag_core (__main__.TestPhase20Bug25To30Conda.test_bug25_irc22_table2_i_rolled_case_insensitive_real_osdag_core) ... ok
+test_bug26_fatigue_shear_cap_matches_tau_y (__main__.TestPhase20Bug25To30Conda.test_bug26_fatigue_shear_cap_matches_tau_y) ... ok
+test_bug27_deckdesign_zero_capacity_inf_and_qt_bar_safe (__main__.TestPhase20Bug25To30Conda.test_bug27_deckdesign_zero_capacity_inf_and_qt_bar_safe) ... ok
+test_bug28_boq_densities_girders_chords_and_disabled_toggles (__main__.TestPhase20Bug25To30Conda.test_bug28_boq_densities_girders_chords_and_disabled_toggles) ... ok
+test_bug29_analysis_results_no_fabricated_22_4_sw_fallback (__main__.TestPhase20Bug25To30Conda.test_bug29_analysis_results_no_fabricated_22_4_sw_fallback) ... ok
+test_bug30_map_coordinates_and_cad_mutable_default (__main__.TestPhase20Bug25To30Conda.test_bug30_map_coordinates_and_cad_mutable_default) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.894s
+
+OK
+[INFO] osdag_latex_env module not found. LaTeX functionalities may be limited.

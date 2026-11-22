@@ -17,10 +17,7 @@ from osdagbridge.core.reports.report_generator import (
 )
 
 
-TECTONIC = os.environ.get("TECTONIC") or shutil.which("tectonic") or (
-    "/Users/rohansiddhpura/.cache/codex-runtimes/codex-primary-runtime/"
-    "dependencies/bin/override/tectonic"
-)
+TECTONIC = os.environ.get("TECTONIC") or shutil.which("tectonic") or "tectonic"
 ORIGINAL_RUN = subprocess.run
 MATRIX_SPEC = importlib.util.spec_from_file_location(
     "phase21_engineering_matrix", Path(__file__).with_name("run_phase21_engineering_matrix.py")

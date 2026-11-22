@@ -239,20 +239,26 @@ def _girder_tables(input_dict, n_girders):
         )
     ]
 
+    def section_mm(key, i):
+        value = input_dict.get(f"{key}.G{i}.M1")
+        if value in ("", None):
+            return ""
+        return f"{float(value) * 1000:.9g} mm"
+
     # Helper: one girder-dimension row
     def _dim_row(g_lbl, i):
         return (g_lbl + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_DEPTH}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_DEPTH, i)
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_WEB_THICKNESS}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_WEB_THICKNESS, i)
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_WIDTH}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_TOP_FLANGE_WIDTH, i)
                 + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_TOP_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_TOP_FLANGE_THICKNESS, i)
                 + r""" & """
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_BOTTOM_FLANGE_WIDTH, i)
                 + ', '
-                + (_render_value(input_dict, f"{KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS}.G{i}.M1", ' mm'))
+                + section_mm(KEY_MP_GIRDER_BOTTOM_FLANGE_THICKNESS, i)
                 + r""" \\[8pt]
 \hline
 """)

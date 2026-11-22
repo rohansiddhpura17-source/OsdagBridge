@@ -10,9 +10,42 @@ from OCC.Extend.TopologyUtils import list_of_shapes_to_compound
 from osdagbridge.core.bridge_types.plate_girder.cad_generator import PlateGirderCADGenerator
 
 
+def framing_plan(components):
+    """Draw the CAD solids in plan with the deck transparent to the framing."""
+    from matplotlib.figure import Figure
+    from matplotlib.collections import PolyCollection
+    from matplotlib.patches import Patch
+
+    fig = Figure(figsize=(9, 3.6), layout="constrained")
+    ax = fig.subplots()
+    legend = []
+    for key, color, label in (
+        ("deck_slab", "#eef1f3", "Deck footprint"),
+        ("cross_bracings", "#97734b", "Cross bracing"),
+        ("girder_top_flanges", "#245779", "Girder top flanges"),
+        ("crash_barriers", "#62676a", "Barriers"),
+    ):
+        faces = components.get(key)
+        if faces is None:
+            continue
+        ax.add_collection(PolyCollection(faces[:, :, :2] / 1000, facecolors=color,
+                                         edgecolors="none", antialiaseds=False))
+        legend.append(Patch(facecolor=color, label=label))
+    ax.autoscale_view()
+    ax.set_aspect("equal")
+    ax.set_xlabel("Longitudinal position (m)")
+    ax.set_ylabel("Transverse position (m)")
+    ax.legend(handles=legend, loc="lower center", bbox_to_anchor=(0.5, 1.01),
+              ncol=len(legend), frameon=False, fontsize=9)
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=160)
+    return buf.getvalue()
+
+
 def cad_views(params):
     data = PlateGirderCADGenerator().generate(params)
     triangles, colors = [], []
+    components = {}
     with TemporaryDirectory() as tmp:
         for key, color in (("girder_web", "#455d72"), ("girder_top_flanges", "#526d85"),
                            ("girder_bottom_flanges", "#526d85"), ("cross_bracings", "#857548"),
@@ -27,11 +60,12 @@ def cad_views(params):
             path = Path(tmp, key + ".stl")
             write_stl_file(shape, str(path), mode="binary")
             records = np.fromfile(path, offset=84, dtype=np.dtype([("normal","<f4",3),("v","<f4",(3,3)),("attr","<u2")]))
+            components[key] = records["v"]
             triangles.extend(records["v"])
             colors.extend([color] * len(records))
     triangles = np.asarray(triangles)
-    images = {}
-    for key, normal, horiz in (("girder_top",[0,0,1],[1,0,0]), ("cross_section",[1,0,0],[0,1,0]),
+    images = {"girder_top": framing_plan(components)}
+    for key, normal, horiz in (("cross_section",[1,0,0],[0,1,0]),
                                 ("final_geometry",[1,-2,1.2],[2,1,0])):
         normal = normal / np.linalg.norm(normal)
         horiz = horiz / np.linalg.norm(horiz)

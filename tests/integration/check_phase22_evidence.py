@@ -1,5 +1,6 @@
 """Check measured Phase 22 evidence after running the documented matrix."""
 import json
+import re
 from pathlib import Path
 from math import isclose
 
@@ -34,3 +35,15 @@ assert f'{backend["design"]["max_dcr"]:.2f} (Girder)' in pdf
 assert f'{backend["envelope"]["max_bm"]:.3f}' in pdf
 assert "85.0 kN/m3" in pdf and "-76.118" in pdf
 print("Six numerical records, two repeats and diagnostic PDF checked.")
+
+# Table 2.7 stores the input geometry in metres. Compare the printed rows
+# with the independently populated millimetre fields in the design output.
+table = pdf.split("Table 2.7:", 1)[1].split("Table 2.8:", 1)[0]
+dimensions = [backend["design"][key] for key in (
+    "D_mm", "tw_mm", "bf_top_mm", "tf_top_mm", "bf_bot_mm", "tf_bot_mm"
+)]
+for girder in backend["design"]["per_girder"]:
+    row = next(line for line in table.splitlines() if line.strip().startswith(girder + " "))
+    assert [float(s) for s in re.findall(r"([\d.]+) mm", row)] == dimensions, row
+assert "Positive-overhang EB1/EB2" in " ".join(pdf.split())
+print("All three Table 2.7 rows match backend millimetre dimensions.")

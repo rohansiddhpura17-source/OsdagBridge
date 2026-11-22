@@ -1,0 +1,4 @@
+Skew weight difference (kN) -2.091067868449386
+Skew weight difference (kN) -2.788090491265791
+Six numerical records, two repeats and diagnostic PDF checked.
+All three Table 2.7 rows match backend millimetre dimensions.

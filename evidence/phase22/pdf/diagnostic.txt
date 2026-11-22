@@ -71,8 +71,8 @@ Project Overview
  Span                            25.0 m
  Carriageway Width               7.5 m
  No. of Girders                  3
- Girder Spacing                  2.8
- Deck Thickness                  250.0
+ Girder Spacing                  2.8 m
+ Deck Thickness                  250.0 mm
  Overall Design Status           Fail (ULS Shear Buckling, Fatigue Normal
                                  Stress, Fatigue Shear Stress, Int.Stiff: Leg �
                                  H_limit, Deck slab)
@@ -89,12 +89,12 @@ Figure 1 – Overall Bridge Plan
 
 
 Osdag | FOSSEE | Indian Institute of Technology Bombay                       Page 2 of 48
-Phase 22 verification |                                               2026-11-23 | Rev 0
+Phase 22 verification |                                             2026-11-23 | Rev 0
 
 
 
 
-Figure 2 – Typical Cross-Section (with girder, deck, barriers, footpath)
+Figure 2 – Typical Bridge Cross-Section
 
 
 
@@ -102,13 +102,13 @@ Figure 2 – Typical Cross-Section (with girder, deck, barriers, footpath)
 Figure 3 – 3D View of Bridge Superstructure
 
 Table 1 – Final Bridge Geometry (after optimization)
-                              G1                      G2                       G3
-   Member ID                 G1M1                    G2M1                     G3M1
-     Section        1390 x 420 x 18 x 420    1390 x 420 x 18 x 420    1390 x 420 x 18 x 420
-   Designation              x 18                     x 18                     x 18
-    Governing       Fatigue Normal Stress    Fatigue Normal Stress    Fatigue Normal Stress
+                              G1                    G2                       G3
+   Member ID                 G1M1                  G2M1                    G3M1
+     Section        1390 x 420 x 18 x 420   1390 x 420 x 18 x 420   1390 x 420 x 18 x 420
+   Designation              x 18                    x 18                    x 18
+    Governing       Fatigue Normal Stress   Fatigue Normal Stress   Fatigue Normal Stress
      Check
-   Utilization            2.16 (Girder)          2.16 (Girder)             2.16 (Girder)
+   Utilization            2.16 (Girder)         2.16 (Girder)           2.16 (Girder)
      Ratio
 Note: Utilization ratio (UR) = demand / capacity. A value < 1.0 indicates a passing
 check.
@@ -119,7 +119,7 @@ Key Design Outcomes Summary
 Girder design FAIL
 Cross bracing design PASS
 
-Osdag | FOSSEE | Indian Institute of Technology Bombay                      Page 3 of 48
+Osdag | FOSSEE | Indian Institute of Technology Bombay                    Page 3 of 48
 Phase 22 verification |                                              2026-11-23 | Rev 0
 
 
@@ -178,6 +178,11 @@ This section records all project metadata as entered by the designer.
    • Indian Standard (IS) 2062: Hot Rolled Structural Steel Specification
 
    • Indian Standard (IS) 6006: Steel Bearings
+
+Project comments Positive-overhang EB1/EB2 stiffness remains unvalidated. The
+tested skewed cases applied 1.49% less steel self-weight than expected. Positive-overhang
+and skewed designs lack engineering acceptance. Native CAD screenshot capture failed
+locally. The geometry figures use offline projections of the generated case solids.
 
 
 
@@ -291,11 +296,11 @@ Osdag | FOSSEE | Indian Institute of Technology Bombay                    Page 7
  Girder       Total         Web, tw     Top Flange (btf ,       ttf )   Bottom Flange        (bbf ,
               Depth, D      (mm)        mm                              tbf ) mm
               (mm)
- G1           1.39 mm       0.008 mm    0.42 mm, 0.018 mm               0.42 mm, 0.018 mm
+ G1           1390 mm       8 mm        420 mm, 18 mm                   420 mm, 18 mm
 
- G2           1.39 mm       0.008 mm    0.42 mm, 0.018 mm               0.42 mm, 0.018 mm
+ G2           1390 mm       8 mm        420 mm, 18 mm                   420 mm, 18 mm
 
- G3           1.39 mm       0.008 mm    0.42 mm, 0.018 mm               0.42 mm, 0.018 mm
+ G3           1390 mm       8 mm        420 mm, 18 mm                   420 mm, 18 mm
 
 
 Table 2.8: Girder Restraint and Stiffener Details
@@ -546,116 +551,113 @@ custom combinations, if any, are appended.
 
 
 Osdag | FOSSEE | Indian Institute of Technology Bombay              Page 14 of 48
-Phase 22 verification |                                                        2026-11-23 | Rev 0
+Phase 22 verification |                                                      2026-11-23 | Rev 0
 
-                                 4   Analysis Results
+                               4   Analysis Results
 A grillage model was used for structural analysis. The deck is idealized as a grid of
 elastic beam elements — longitudinal members represent the composite steel girders with
 effective slab, and transverse members represent the slab or cross frames. This section
 summarizes the critical output from that analysis.
 
 Table 4.1: Summary of Maximum Demands
-      Load               Bending Moment                     Shear Force            Reaction at Supports
-      Case/            Max            Loc.         Max                    Loc.
-      Comb.                    Girder                          Girder                Left       Right
-                      (kNm)           (m)          (kN)                   (m)
-      EQ_X             0.000         —     —        0.000        —         —         0.000       0.000
-
- Crash barrier load   137.547        G1   13.235   31.538        G1       23.529    -98.485    -110.795
-
-SEISMIC_4: 1.0DL      1071.222       G2   13.235   237.645       G1       0.000    -878.092    -823.281
+      Load              Bending Moment                    Shear Force            Reaction at Supports
+      Case/           Max            Loc.        Max                    Loc.
+      Comb.                   Girder                         Girder                Left       Right
+                     (kNm)           (m)         (kN)                   (m)
+SEISMIC_4: 1.0DL    1071.222       G2   13.235   237.645       G1       0.000    -878.092    -823.281
  + 1.0DW + 0.2LL
      + 0.75EL
-   SLS_RARE_4:        1884.088       G2   13.235   401.987       G1       0.000    -1481.542   -1207.489
+      1.0 DW         159.442       G1   11.765   35.864        G1       0.000    -132.441    -132.441
+
+      1.0 WL         91.997        G1   13.235   20.183        G1       23.529    73.902      73.902
+
+      EQ_Y           241.950       G1   13.235   53.082        G1       23.529    194.360    194.360
+
+   SLS_RARE_4:      1884.088       G2   13.235   401.987       G1       0.000    -1481.542   -1207.489
  1.0DL + 1.0DW +
    1.0LL + 0.6WL
-    1.5 EQ (c)        362.925        G1   11.765   79.622        G1       23.529    291.541    291.541
-
- ACCIDENTAL_1:        1724.348       G2   13.235   371.397       G1       0.000    -1369.001   -1163.462
+ ACCIDENTAL_3:      1724.348       G2   13.235   371.397       G1       0.000    -1369.001   -1163.462
  1.0DL + 1.0DW +
       0.75LL
-    1.5 EQ (b)        108.877        G1   13.235   23.887        G1       23.529    87.462      87.462
+      EQ_X            0.000        —     —        0.000        —         —         0.000       0.000
 
-      1.0 DL          925.179        G1   13.235   207.432       G1       23.529   -765.916    -765.916
-
-       SLS_           1206.148       G2   13.235   267.365       G1       0.000    -986.911    -932.101
-  FREQUENT_6:
- 1.0DL + 1.0DW +
-   0.2LL + 0.5WL
-       SLS_           1196.985       G2   13.235   265.347       G1       0.000    -979.521    -924.710
-  FREQUENT_5:
- 1.0DL + 1.0DW +
-   0.2LL + 0.6WL
-SLS_QP_2: 1.0DL       1084.621       G1   13.235   243.296       G1       0.000    -898.357    -898.357
-    + 1.0DW
- BASIC_2: 1.35DL      2372.034       G2   13.235   508.942       G1       0.000    -1876.560   -1561.400
-    + 1.75DW +
-  1.15LL + 1.5WL
-    1.5 EQ (a)        108.877        G1   11.765   23.887        G1       0.000     87.462      87.462
-
-SLS_QP_1: 1.0DL       1116.509       G1   13.235   250.469       G1       0.000    -924.845    -924.845
-    + 1.2DW
-
-
-
-
-Osdag | FOSSEE | Indian Institute of Technology Bombay                              Page 15 of 48
-Phase 22 verification |                                                  2026-11-23 | Rev 0
-
-
-      Load              Bending Moment                Shear Force            Reaction at Supports
-      Case/           Max            Loc.    Max                    Loc.
-      Comb.                   Girder                     Girder                Left       Right
-                     (kNm)           (m)     (kN)                   (m)
-BASIC_6: 1.0DL +    1985.430   G2   13.235   421.552       G1       0.000    -1553.500   -1238.340
-1.0DW + 1.15LL +
-     0.9WL
-BASIC_1: 1.35DL     2727.621   G2   13.235   580.832       G1       0.000    -2140.535   -1729.457
-+ 1.75DW + 1.5LL
-     + 0.9WL
-   Envelope ULS     2727.621   G2   13.235   580.832       G1       0.000       —           —
-
-  WL Transverse       0.000    —      —       0.000        —         —        -0.000      -0.000
-
-        SW           94.751    G1   13.235   20.638        G1       0.000     -76.118     -76.118
-
-       SLS_         1678.532   G2   13.235   361.305       G1       0.000    -1332.050   -1126.511
-  FREQUENT_4:
- 1.0DL + 1.0DW +
-  0.75LL + 0.5WL
-      EQ_Y           241.950   G1   13.235   53.082        G1       23.529    194.360    194.360
-
-SEISMIC_3: 1.0DL     890.481   G2   13.235   197.834       G1       0.000    -732.321    -677.511
- + 1.0DW + 0.2LL
-      + 1.5EL
-     WL Uplift       91.997    G1   13.235   20.183        G1       23.529    73.902      73.902
-
-       SLS_         1237.907   G2   13.235   274.538       G1       0.000    -1013.399   -958.589
-  FREQUENT_3:
- 1.0DL + 1.2DW +
-   0.2LL + 0.5WL
-      EQ_Z            0.000    —      —       0.000        —         —         0.000       0.000
-
-   Envelope SLS     1915.846   G2   13.235   409.160       G1       0.000       —           —
-
-   SLS_RARE_6:      1669.368   G2   13.235   359.287       G1       0.000    -1324.660   -1119.121
- 1.0DL + 1.0DW +
-  0.75LL + 0.6WL
-    SEISMIC_1:      1332.442   G1   11.765   297.334       G1       0.000    -1099.723   -1044.912
- 1.35DL + 1.75DW
- + 0.2LL + 1.5EL
-       SLS_         1228.744   G2   13.235   272.519       G1       0.000    -1006.009   -951.199
+       SLS_         1228.744       G2   13.235   272.519       G1       0.000    -1006.009   -951.199
   FREQUENT_2:
  1.0DL + 1.2DW +
    0.2LL + 0.6WL
-       SLS_         1710.290   G2   13.235   368.478       G1       0.000    -1358.539   -1152.999
+   Envelope SLS     1915.846       G2   13.235   409.160       G1       0.000       —           —
+
+SLS_QP_2: 1.0DL     1084.621       G1   13.235   243.296       G1       0.000    -898.357    -898.357
+    + 1.0DW
+   Envelope ULS     2727.621       G2   13.235   580.832       G1       0.000       —           —
+
+   SLS_RARE_3:      1701.127       G2   13.235   366.460       G1       0.000    -1351.148   -1145.609
+ 1.0DL + 1.2DW +
+  0.75LL + 0.6WL
+       SLS_         1710.290       G2   13.235   368.478       G1       0.000    -1358.539   -1152.999
   FREQUENT_1:
  1.0DL + 1.2DW +
   0.75LL + 0.5WL
 
 
 
-Osdag | FOSSEE | Indian Institute of Technology Bombay                        Page 16 of 48
+
+Osdag | FOSSEE | Indian Institute of Technology Bombay                            Page 15 of 48
+Phase 22 verification |                                                    2026-11-23 | Rev 0
+
+
+      Load               Bending Moment                 Shear Force            Reaction at Supports
+      Case/            Max            Loc.     Max                    Loc.
+      Comb.                    Girder                      Girder                Left       Right
+                      (kNm)           (m)      (kN)                   (m)
+       SLS_           1678.532   G2   13.235   361.305       G1       0.000    -1332.050   -1126.511
+  FREQUENT_4:
+ 1.0DL + 1.0DW +
+  0.75LL + 0.5WL
+ Crash barrier load   137.547    G1   13.235   31.538        G1       23.529    -98.485    -110.795
+
+  1.0 DL + 1.0 LL     1780.275   G2   13.235   378.233       G1       0.000    -1393.442   -1119.390
+
+   SLS_RARE_5:        1632.716   G2   13.235   351.214       G1       0.000    -1295.099   -1089.560
+ 1.0DL + 1.0DW +
+  0.75LL + 1.0WL
+     WL Uplift         91.997    G1   13.235   20.183        G1       23.529    73.902      73.902
+
+ WL Longitudinal       0.000     —     —        0.000        —         —        -0.000      -0.000
+
+BASIC_1: 1.35DL       2727.621   G2   13.235   580.832       G1       0.000    -2140.535   -1729.457
++ 1.75DW + 1.5LL
+     + 0.9WL
+ BASIC_2: 1.35DL      2372.034   G2   13.235   508.942       G1       0.000    -1876.560   -1561.400
+    + 1.75DW +
+  1.15LL + 1.5WL
+    1.5 EQ (b)        108.877    G1   13.235   23.887        G1       23.529    87.462      87.462
+
+  WL Transverse        0.000     —     —        0.000        —         —        -0.000      -0.000
+
+    1.5 EQ (c)        362.925    G1   11.765   79.622        G1       23.529    291.541    291.541
+
+ BASIC_3: 1.35DL      2427.013   G2   13.235   521.052       G1       0.000    -1920.901   -1605.741
+    + 1.75DW +
+  1.15LL + 0.9WL
+       SLS_           1206.148   G2   13.235   267.365       G1       0.000    -986.911    -932.101
+  FREQUENT_6:
+ 1.0DL + 1.0DW +
+   0.2LL + 0.5WL
+SEISMIC_3: 1.0DL      890.481    G2   13.235   197.834       G1       0.000    -732.321    -677.511
+ + 1.0DW + 0.2LL
+      + 1.5EL
+BASIC_4: 1.0DL +      2286.038   G2   13.235   481.333       G1       0.000    -1773.134   -1362.056
+1.0DW + 1.5LL +
+     0.9WL
+   SLS_RARE_1:        1915.846   G2   13.235   409.160       G1       0.000    -1508.030   -1233.978
+ 1.0DL + 1.2DW +
+   1.0LL + 0.6WL
+
+
+
+
+Osdag | FOSSEE | Indian Institute of Technology Bombay                          Page 16 of 48
 Phase 22 verification |                                                  2026-11-23 | Rev 0
 
 
@@ -663,45 +665,49 @@ Osdag | FOSSEE | Indian Institute of Technology Bombay                        Pa
       Case/           Max            Loc.    Max                    Loc.
       Comb.                   Girder                     Girder                Left       Right
                      (kNm)           (m)     (kN)                   (m)
-  1.0 DL + 1.0 LL   1780.275   G2   13.235   378.233       G1       0.000    -1393.442   -1119.390
-
-BASIC_5: 1.0DL +    1930.451   G2   13.235   409.442       G1       0.000    -1509.159   -1193.999
-1.0DW + 1.15LL +
-     1.5WL
+       SLS_         1196.985   G2   13.235   265.347       G1       0.000    -979.521    -924.710
+  FREQUENT_5:
+ 1.0DL + 1.0DW +
+   0.2LL + 0.6WL
         DD           830.427   G1   13.235   186.794       G1       23.529   -689.798    -689.798
 
- WL Longitudinal      0.000    —      —       0.000        —         —        -0.000      -0.000
+      1.0 DL         925.179   G1   13.235   207.432       G1       23.529   -765.916    -765.916
 
-   SLS_RARE_5:      1632.716   G2   13.235   351.214       G1       0.000    -1295.099   -1089.560
- 1.0DL + 1.0DW +
-  0.75LL + 1.0WL
    SLS_RARE_2:      1664.474   G2   13.235   358.387       G1       0.000    -1321.587   -1116.048
  1.0DL + 1.2DW +
   0.75LL + 1.0WL
-      1.0 DW         159.442   G1   11.765   35.864        G1       0.000    -132.441    -132.441
+        SW           94.751    G1   13.235   20.638        G1       0.000     -76.118     -76.118
 
- ACCIDENTAL_3:      1724.348   G2   13.235   371.397       G1       0.000    -1369.001   -1163.462
+ ACCIDENTAL_1:      1724.348   G2   13.235   371.397       G1       0.000    -1369.001   -1163.462
  1.0DL + 1.0DW +
       0.75LL
-BASIC_4: 1.0DL +    2286.038   G2   13.235   481.333       G1       0.000    -1773.134   -1362.056
-1.0DW + 1.5LL +
-     0.9WL
-   SLS_RARE_1:      1915.846   G2   13.235   409.160       G1       0.000    -1508.030   -1233.978
- 1.0DL + 1.2DW +
-   1.0LL + 0.6WL
-   SLS_RARE_3:      1701.127   G2   13.235   366.460       G1       0.000    -1351.148   -1145.609
- 1.0DL + 1.2DW +
-  0.75LL + 0.6WL
- BASIC_3: 1.35DL    2427.013   G2   13.235   521.052       G1       0.000    -1920.901   -1605.741
-    + 1.75DW +
-  1.15LL + 0.9WL
+    SEISMIC_1:      1332.442   G1   11.765   297.334       G1       0.000    -1099.723   -1044.912
+ 1.35DL + 1.75DW
+ + 0.2LL + 1.5EL
+SLS_QP_1: 1.0DL     1116.509   G1   13.235   250.469       G1       0.000    -924.845    -924.845
+    + 1.2DW
  ACCIDENTAL_2:      1724.348   G2   13.235   371.397       G1       0.000    -1369.001   -1163.462
  1.0DL + 1.0DW +
       0.75LL
+   SLS_RARE_6:      1669.368   G2   13.235   359.287       G1       0.000    -1324.660   -1119.121
+ 1.0DL + 1.0DW +
+  0.75LL + 0.6WL
+BASIC_5: 1.0DL +    1930.451   G2   13.235   409.442       G1       0.000    -1509.159   -1193.999
+1.0DW + 1.15LL +
+     1.5WL
+    1.5 EQ (a)       108.877   G1   11.765   23.887        G1       0.000     87.462      87.462
+
+BASIC_6: 1.0DL +    1985.430   G2   13.235   421.552       G1       0.000    -1553.500   -1238.340
+1.0DW + 1.15LL +
+     0.9WL
     SEISMIC_2:      1513.904   G1   11.765   337.145       G1       0.000    -1245.493   -1190.683
  1.35DL + 1.75DW
  + 0.2LL + 0.75EL
-      1.0 WL         91.997    G1   13.235   20.183        G1       23.529    73.902      73.902
+       SLS_         1237.907   G2   13.235   274.538       G1       0.000    -1013.399   -958.589
+  FREQUENT_3:
+ 1.0DL + 1.2DW +
+   0.2LL + 0.5WL
+      EQ_Z            0.000    —      —       0.000        —         —         0.000       0.000
 
 
 
@@ -713,43 +719,45 @@ Osdag | FOSSEE | Indian Institute of Technology Bombay                        Pa
 Table 4.2: Reactions at Supports
          Load Case              Left Support (kN)        Right Support (kN)
 
-            EQ_X                       0.000                    0.000
-
-      Crash barrier load              -98.485                 -110.795
-
     SEISMIC_4: 1.0DL +                -878.092                -823.281
   1.0DW + 0.2LL + 0.75EL
+           1.0 DW                     -132.441                -132.441
+
+           1.0 WL                      73.902                  73.902
+
+            EQ_Y                      194.360                  194.360
+
   SLS_RARE_4: 1.0DL +                -1481.542                -1207.489
   1.0DW + 1.0LL + 0.6WL
-          1.5 EQ (c)                  291.541                  291.541
-
- ACCIDENTAL_1: 1.0DL +               -1369.001                -1163.462
+ ACCIDENTAL_3: 1.0DL +               -1369.001                -1163.462
      1.0DW + 0.75LL
-          1.5 EQ (b)                   87.462                  87.462
+            EQ_X                       0.000                    0.000
 
-            1.0 DL                    -765.916                -765.916
-
-    SLS_FREQUENT_6:                   -986.911                -932.101
- 1.0DL + 1.0DW + 0.2LL +
-          0.5WL
-    SLS_FREQUENT_5:                   -979.521                -924.710
- 1.0DL + 1.0DW + 0.2LL +
+    SLS_FREQUENT_2:                  -1006.009                -951.199
+ 1.0DL + 1.2DW + 0.2LL +
           0.6WL
     SLS_QP_2: 1.0DL +                 -898.357                -898.357
          1.0DW
-    BASIC_2: 1.35DL +                -1876.560                -1561.400
- 1.75DW + 1.15LL + 1.5WL
-          1.5 EQ (a)                   87.462                  87.462
+  SLS_RARE_3: 1.0DL +                -1351.148                -1145.609
+ 1.2DW + 0.75LL + 0.6WL
+    SLS_FREQUENT_1:                  -1358.539                -1152.999
+  1.0DL + 1.2DW + 0.75LL
+         + 0.5WL
+    SLS_FREQUENT_4:                  -1332.050                -1126.511
+  1.0DL + 1.0DW + 0.75LL
+         + 0.5WL
+      Crash barrier load              -98.485                 -110.795
 
-    SLS_QP_1: 1.0DL +                 -924.845                -924.845
-         1.2DW
- BASIC_6: 1.0DL + 1.0DW              -1553.500                -1238.340
-    + 1.15LL + 0.9WL
+       1.0 DL + 1.0 LL               -1393.442                -1119.390
+
+  SLS_RARE_5: 1.0DL +                -1295.099                -1089.560
+ 1.0DW + 0.75LL + 1.0WL
+          WL Uplift                    73.902                  73.902
+
+      WL Longitudinal                  -0.000                  -0.000
+
     BASIC_1: 1.35DL +                -2140.535                -1729.457
  1.75DW + 1.5LL + 0.9WL
-       WL Transverse                   -0.000                  -0.000
-
-             SW                       -76.118                  -76.118
 
 
 
@@ -759,66 +767,67 @@ Osdag | FOSSEE | Indian Institute of Technology Bombay           Page 18 of 48
 
 
 
-    SLS_FREQUENT_4:                  -1332.050            -1126.511
-  1.0DL + 1.0DW + 0.75LL
-         + 0.5WL
-            EQ_Y                      194.360              194.360
+    BASIC_2: 1.35DL +                -1876.560            -1561.400
+ 1.75DW + 1.15LL + 1.5WL
+          1.5 EQ (b)                   87.462               87.462
 
+       WL Transverse                   -0.000               -0.000
+
+          1.5 EQ (c)                  291.541              291.541
+
+    BASIC_3: 1.35DL +                -1920.901            -1605.741
+ 1.75DW + 1.15LL + 0.9WL
+    SLS_FREQUENT_6:                   -986.911             -932.101
+ 1.0DL + 1.0DW + 0.2LL +
+          0.5WL
    SEISMIC_3: 1.0DL +                 -732.321             -677.511
   1.0DW + 0.2LL + 1.5EL
-          WL Uplift                    73.902               73.902
-
-    SLS_FREQUENT_3:                  -1013.399             -958.589
- 1.0DL + 1.2DW + 0.2LL +
-          0.5WL
-            EQ_Z                       0.000                0.000
-
-  SLS_RARE_6: 1.0DL +                -1324.660            -1119.121
- 1.0DW + 0.75LL + 0.6WL
-   SEISMIC_1: 1.35DL +               -1099.723            -1044.912
-  1.75DW + 0.2LL + 1.5EL
-    SLS_FREQUENT_2:                  -1006.009             -951.199
- 1.0DL + 1.2DW + 0.2LL +
-          0.6WL
-    SLS_FREQUENT_1:                  -1358.539            -1152.999
-  1.0DL + 1.2DW + 0.75LL
-         + 0.5WL
-       1.0 DL + 1.0 LL               -1393.442            -1119.390
-
- BASIC_5: 1.0DL + 1.0DW              -1509.159            -1193.999
-    + 1.15LL + 1.5WL
-              DD                      -689.798             -689.798
-
-      WL Longitudinal                  -0.000               -0.000
-
-  SLS_RARE_5: 1.0DL +                -1295.099            -1089.560
- 1.0DW + 0.75LL + 1.0WL
-  SLS_RARE_2: 1.0DL +                -1321.587            -1116.048
- 1.2DW + 0.75LL + 1.0WL
-           1.0 DW                     -132.441             -132.441
-
- ACCIDENTAL_3: 1.0DL +               -1369.001            -1163.462
-     1.0DW + 0.75LL
  BASIC_4: 1.0DL + 1.0DW              -1773.134            -1362.056
     + 1.5LL + 0.9WL
+  SLS_RARE_1: 1.0DL +                -1508.030            -1233.978
+  1.2DW + 1.0LL + 0.6WL
+    SLS_FREQUENT_5:                   -979.521             -924.710
+ 1.0DL + 1.0DW + 0.2LL +
+          0.6WL
+              DD                      -689.798             -689.798
+
+            1.0 DL                    -765.916             -765.916
+
+  SLS_RARE_2: 1.0DL +                -1321.587            -1116.048
+ 1.2DW + 0.75LL + 1.0WL
+             SW                       -76.118               -76.118
+
+ ACCIDENTAL_1: 1.0DL +               -1369.001            -1163.462
+     1.0DW + 0.75LL
+   SEISMIC_1: 1.35DL +               -1099.723            -1044.912
+  1.75DW + 0.2LL + 1.5EL
+    SLS_QP_1: 1.0DL +                 -924.845             -924.845
+         1.2DW
+ ACCIDENTAL_2: 1.0DL +               -1369.001            -1163.462
+     1.0DW + 0.75LL
+  SLS_RARE_6: 1.0DL +                -1324.660            -1119.121
+ 1.0DW + 0.75LL + 0.6WL
 
 
-Osdag | FOSSEE | Indian Institute of Technology Bombay       Page 19 of 48
+
+
+Osdag | FOSSEE | Indian Institute of Technology Bombay        Page 19 of 48
 Phase 22 verification |                                  2026-11-23 | Rev 0
 
 
 
-  SLS_RARE_1: 1.0DL +                  -1508.030          -1233.978
-  1.2DW + 1.0LL + 0.6WL
-  SLS_RARE_3: 1.0DL +                  -1351.148          -1145.609
- 1.2DW + 0.75LL + 0.6WL
-    BASIC_3: 1.35DL +                  -1920.901          -1605.741
- 1.75DW + 1.15LL + 0.9WL
- ACCIDENTAL_2: 1.0DL +                 -1369.001          -1163.462
-     1.0DW + 0.75LL
+ BASIC_5: 1.0DL + 1.0DW                -1509.159          -1193.999
+    + 1.15LL + 1.5WL
+          1.5 EQ (a)                    87.462              87.462
+
+ BASIC_6: 1.0DL + 1.0DW                -1553.500          -1238.340
+    + 1.15LL + 0.9WL
    SEISMIC_2: 1.35DL +                 -1245.493          -1190.683
  1.75DW + 0.2LL + 0.75EL
-           1.0 WL                       73.902              73.902
+    SLS_FREQUENT_3:                    -1013.399           -958.589
+ 1.0DL + 1.2DW + 0.2LL +
+          0.5WL
+            EQ_Z                         0.000              0.000
 
 
 Table 4.3: Deflection Summary (Live Load & Total Load)

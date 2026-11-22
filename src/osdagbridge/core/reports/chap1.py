@@ -43,6 +43,7 @@ This section records all project metadata as entered by the designer.
 \item Indian Standard (IS) 2062: Hot Rolled Structural Steel Specification
 \item Indian Standard (IS) 6006: Steel Bearings
 \end{itemize}
-"""
+""" + ("\n" + r"\paragraph{Project comments}" + " " + _tex(m.additional_comments)
+       if getattr(m, "additional_comments", "") else "")
 
 

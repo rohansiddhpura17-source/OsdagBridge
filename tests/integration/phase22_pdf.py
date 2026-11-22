@@ -19,7 +19,12 @@ def main():
     for key, data in figures.items():
         (out / (key + ".png")).write_bytes(data)
     meta = ReportMetadata("Phase 22 verification", "Delhi", "Screening project", "Diagnostic fixture", "Local validation",
-                          report_date="2026-11-23")
+                          report_date="2026-11-23", additional_comments=(
+                              ""
+                              "Positive-overhang EB1/EB2 stiffness remains unvalidated. The tested skewed cases "
+                              "applied 1.49% less steel self-weight than expected. Positive-overhang and skewed "
+                              "designs lack engineering acceptance. Native CAD screenshot capture failed locally. "
+                              "The geometry figures use offline projections of the generated case solids."))
     request = ReportRequest(meta, ReportOptions(["loads", "analysis", "design_checks"], True, True, True),
                             str(out), "diagnostic")
     # Compile a fresh file in the report generator's own temporary directory.

@@ -1,0 +1,88 @@
+test_basic_material_and_advanced_reject_nonfinite (test_phase11_nonfinite.NonfiniteBoundaryTests.test_basic_material_and_advanced_reject_nonfinite) ... ok
+test_nested_nonfinite_rejected (test_phase11_nonfinite.NonfiniteBoundaryTests.test_nested_nonfinite_rejected) ... ok
+test_set_input_rejects_without_replacing_previous_state (test_phase11_nonfinite.NonfiniteBoundaryTests.test_set_input_rejects_without_replacing_previous_state) ... ok
+test_valid_values_and_enums_unchanged (test_phase11_nonfinite.NonfiniteBoundaryTests.test_valid_values_and_enums_unchanged) ... ok
+test_compound_factor_scales_point_line_and_patch_magnitudes (test_phase15_regressions.Phase15RegressionTests.test_compound_factor_scales_point_line_and_patch_magnitudes) ... ok
+test_executive_summary_does_not_hide_backend_failure (test_phase15_regressions.Phase15RegressionTests.test_executive_summary_does_not_hide_backend_failure) ... ok
+test_executive_summary_reports_failed_deck_and_unassessed_members (test_phase15_regressions.Phase15RegressionTests.test_executive_summary_reports_failed_deck_and_unassessed_members) ... ok
+test_no_footpath_has_zero_effective_width_and_baseline_load (test_phase15_regressions.Phase15RegressionTests.test_no_footpath_has_zero_effective_width_and_baseline_load) ... ok
+test_nodal_combination_factor_changes_command_only (test_phase15_regressions.Phase15RegressionTests.test_nodal_combination_factor_changes_command_only) ... ok
+test_shear_connector_spacing_table_checks_governing_and_minimum (test_phase15_regressions.Phase15RegressionTests.test_shear_connector_spacing_table_checks_governing_and_minimum) ... ok
+test_shear_connector_table_converts_concrete_gpa_to_mpa (test_phase15_regressions.Phase15RegressionTests.test_shear_connector_table_converts_concrete_gpa_to_mpa) ... ok
+test_inverse_matches_independent_forward_mapping (test_phase22_validation.NaturalCoordinates.test_inverse_matches_independent_forward_mapping) ... ok
+test_bug13_build_girders_and_plot_alignment_multi_config (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_bug13_build_girders_and_plot_alignment_multi_config)
+BUG-13: edge_dist inference, EB1/G1..Gn/EB2 naming, plot & cache 1-to-1 alignment. ... ok
+test_bug13_edge_dist_dcr_config_and_steel_dialog_wiring (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_bug13_edge_dist_dcr_config_and_steel_dialog_wiring)
+BUG-13: PlateGirderBridge edge_dist propagation, BridgeConfig.n_girders, SteelDesign combo. ... ok
+test_bug14_cross_bracing_count_reduction_prunes_stale_member_keys (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_bug14_cross_bracing_count_reduction_prunes_stale_member_keys)
+BUG-14 / ADV-003: reducing brace count 29 -> 3 must delete B*M4..M29 keys. ... ok
+test_bug14_seeders_preserve_user_values_and_store_area_in_m2 (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_bug14_seeders_preserve_user_values_and_store_area_in_m2)
+BUG-14: re-seeding on Design Mode change must not overwrite edited values or change units. ... ok
+test_cad_viewport_refresh_api_and_show_ordering (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_cad_viewport_refresh_api_and_show_ordering) ... ok
+test_captioned_longtables_start_a_caption_row_break_across_all_chapters (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_captioned_longtables_start_a_caption_row_break_across_all_chapters) ... ok
+test_concrete_excel_export_converts_gpa_and_reports_raw_ratio (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_concrete_excel_export_converts_gpa_and_reports_raw_ratio) ... ok
+test_cross_bracing_and_end_diaphragm_material_mapping_and_capacity (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_cross_bracing_and_end_diaphragm_material_mapping_and_capacity) ... ok
+test_custom_deck_density_is_passed_to_load_model (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_custom_deck_density_is_passed_to_load_model) ... ok
+test_custom_steel_density_reaches_steel_properties (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_custom_steel_density_reaches_steel_properties) ... ok
+test_custom_steel_density_scales_self_weight_load_model (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_custom_steel_density_scales_self_weight_load_model) ... ok
+test_deck_design_receives_ecm_in_mpa (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_deck_design_receives_ecm_in_mpa) ... ok
+test_dynamic_dictionary_commit_removes_deleted_keys_and_preserves_identity (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_dynamic_dictionary_commit_removes_deleted_keys_and_preserves_identity) ... ok
+test_explicit_steel_density_overrides_database_grade_and_converts_units (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_explicit_steel_density_overrides_database_grade_and_converts_units) ... ok
+test_invalid_explicit_steel_density_is_rejected (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_invalid_explicit_steel_density_is_rejected) ... ok
+test_optimized_30_32_30_transition_clears_stale_fields_and_marks_dirty (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_optimized_30_32_30_transition_clears_stale_fields_and_marks_dirty) ... ok
+test_osi_validator_rejects_nonfinite_material_and_geometry_values (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_osi_validator_rejects_nonfinite_material_and_geometry_values) ... ok
+test_permanent_load_summary_uses_custom_steel_and_deck_densities (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_permanent_load_summary_uses_custom_steel_and_deck_densities) ... ok
+test_shear_modulus_and_poisson_preserves_precision (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_shear_modulus_and_poisson_preserves_precision) ... ok
+test_steel_density_defaults_to_database_or_legacy_custom_default (test_phase89_candidate_regressions.Phase89CandidateRegressionTests.test_steel_density_defaults_to_database_or_legacy_custom_default) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 1.607s
+
+OK
+[INFO] osdag_latex_env module not found. LaTeX functionalities may be limited.
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 8.4 m
+  no_of_girders = 4
+  girder_spacing = 2.1 m
+  deck_overhang = 1.05 m
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 8.4 m
+  no_of_girders = 4
+  girder_spacing = 2.1 m
+  deck_overhang = 1.05 m
+
+------------------------------------------------------------
+  CROSS BRACING DESIGNS  (1 pair(s))  diag L=2000 mm  chord L=1700 mm
+------------------------------------------------------------
+  Total time : 0.000s  |  2 designs
+------------------------------------------------------------
+Self weight line load @ z=-1.500 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=0.000 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=1.500 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=-1.500 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=0.000 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=1.500 m: 3400.00 N/m (A=0.04000 m²)
+Self weight line load @ z=-1.500 m: 3140.00 N/m (A=0.04000 m²)
+Self weight line load @ z=0.000 m: 3140.00 N/m (A=0.04000 m²)
+Self weight line load @ z=1.500 m: 3140.00 N/m (A=0.04000 m²)
+
+============================================================
+  DECK SLAB DESIGN RESULTS
+============================================================
+ok
+============================================================
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 5.15 m
+  no_of_girders = 3
+  girder_spacing = 1.7167 m
+  deck_overhang = 0.8583 m
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 5.15 m
+  no_of_girders = 3
+  girder_spacing = 1.7167 m
+  deck_overhang = 0.8583 m
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 5.15 m
+  no_of_girders = 3
+  girder_spacing = 1.7167 m
+  deck_overhang = 0.8583 m
