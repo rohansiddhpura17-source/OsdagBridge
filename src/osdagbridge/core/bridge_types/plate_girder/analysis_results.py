@@ -446,37 +446,59 @@ class PlateGirderAnalysisResults:
     def build_girders(self, verbose=True):
 
         nodes, elements, adj = self.build_grillage_connectivity()
+        # Global min/max X do not identify all girder endpoints on a skewed
+        # bridge: each transverse grid line is longitudinally offset. Group
+        # longitudinal elements by their constant Z coordinate, then walk each
+        # line in X order so every physical girder and edge line is retained.
+        lines = defaultdict(list)
+        for eid, conn in elements.items():
+            if len(conn) != 2:
+                continue
+            n1, n2 = conn
+            z1 = float(nodes[n1][2])
+            z2 = float(nodes[n2][2])
+            if abs(z1 - z2) <= 1e-6:
+                lines[round((z1 + z2) / 2.0, 6)].append(eid)
 
-        # AUTO EXTRACT START / END
-        x_coords = {n: coord[0] for n, coord in nodes.items()}
+        ordered_lines = []
+        for z, eids in sorted(lines.items()):
+            ordered_eids = sorted(
+                eids,
+                key=lambda eid: min(float(nodes[n][0]) for n in elements[eid]),
+            )
+            path = []
+            for eid in ordered_eids:
+                n1, n2 = elements[eid]
+                if not path:
+                    # Start at the smaller X endpoint regardless of element
+                    # orientation in the active OpenSees domain.
+                    start, end = sorted((n1, n2), key=lambda n: float(nodes[n][0]))
+                    path.extend((start, end))
+                elif path[-1] == n1:
+                    path.append(n2)
+                elif path[-1] == n2:
+                    path.append(n1)
+                else:
+                    raise ValueError(
+                        f"Longitudinal line at z={z:g} m is disconnected before element {eid}."
+                    )
+            if path:
+                ordered_lines.append((z, ordered_eids, path))
 
-        min_x = min(x_coords.values())
-        max_x = max(x_coords.values())
-
-        start_nodes = [n for n, x in x_coords.items() if x == min_x]
-        end_nodes = [n for n, x in x_coords.items() if x == max_x]
-
-        start_nodes.sort(key=lambda n: nodes[n][2])
-        end_nodes.sort(key=lambda n: nodes[n][2])
+        if not ordered_lines:
+            raise ValueError("No longitudinal girder lines were found in the active model.")
 
         if verbose:
-            print("\nStart edge nodes :", start_nodes)
-            print("End edge nodes   :", end_nodes)
-
-        # span length
-        x_coords = [c[0] for c in nodes.values()]
-        span_length = max(x_coords) - min(x_coords)
-
-        if verbose:
-            print(f"\nSpan length from geometry = {span_length}\n")
+            print("\nLongitudinal lines (z, first node, last node):", [
+                (z, path[0], path[-1]) for z, _eids, path in ordered_lines
+            ])
 
         girder_map = {}
-        all_pairs = list(zip(start_nodes, end_nodes))
-        num_pairs = len(all_pairs)
+        num_pairs = len(ordered_lines)
 
         has_edge_beams = (self.edge_dist > 0) and (num_pairs >= 3)
         main_idx = 0
-        for i, (s, e) in enumerate(all_pairs, start=1):
+        for i, (z, line_eids, path) in enumerate(ordered_lines, start=1):
             # --- NAMING LOGIC ---
             # When deck overhang edge beams exist, label the outermost two
             # longitudinal lines EB1/EB2 and number the structural main
@@ -490,11 +512,13 @@ class PlateGirderAnalysisResults:
                 main_idx += 1
                 name = f"G{main_idx}"
 
-            path = self.bfs_shortest_path(adj, s, e)
-            path_elements, element_map = self.get_elements_along_path(path, elements)
+            path_elements = list(line_eids)
+            element_map = [
+                (eid, path[j], path[j + 1])
+                for j, eid in enumerate(path_elements)
+            ]
             length = self.compute_path_distance(nodes, path)
-
-            status = "VERIFIED" if abs(length - span_length) < 1e-6 else "NOT MATCHING"
+            status = "CONNECTED" if length > 0.0 else "DISCONNECTED"
 
             if verbose:
                 print("----------------------------------------")
@@ -512,8 +536,8 @@ class PlateGirderAnalysisResults:
                 print("----------------------------------------\n")
 
             girder_map[name] = {
-                "start": s,
-                "end": e,
+                "start": path[0],
+                "end": path[-1],
                 "path": path,
                 "elements": path_elements,
                 "element_map": element_map,

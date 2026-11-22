@@ -2,6 +2,7 @@ from __future__ import annotations
 import sqlite3
 import types
 from pathlib import Path
+from math import isfinite
 from .ui_fields import FrontendData
 from .dto import (
     ConcreteProperties,
@@ -1316,11 +1317,36 @@ class PlateGirderBridge:
             raw_v = self.input_dict.get(KEY_MATERIAL_GIRDER_POISSON)
             v = float(raw_v) if raw_v not in (None, "") else 0.3
 
-        rho = self._lookup_material(steel_grade, "Density")
-        if rho is None:
-            raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
-            rho = (float(raw_rho) * 1000.0
-                   if raw_rho not in (None, "") else _DEFAULT_DENSITY)
+        # The material dialog's density is an explicit override for every grade,
+        # including database grades. It is expressed in kN/m³; SteelProperties
+        # and the grillage material API use N/m³.
+        raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
+        if raw_rho not in (None, ""):
+            try:
+                rho_kN_m3 = float(raw_rho)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(
+                    f"Girder steel density must be a finite value between "
+                    f"50 and 120 kN/m³; received {raw_rho!r}."
+                ) from exc
+            if not isfinite(rho_kN_m3) or not 50.0 <= rho_kN_m3 <= 120.0:
+                raise ValueError(
+                    f"Girder steel density must be a finite value between "
+                    f"50 and 120 kN/m³; received {raw_rho!r}."
+                )
+            rho = rho_kN_m3 * 1000.0
+        else:
+            # Keep each database grade's value when no explicit UI/OSI value
+            # was supplied; custom materials retain the established default.
+            rho = self._lookup_material(steel_grade, "Density")
+            if rho is None:
+                rho = _DEFAULT_DENSITY
+            if not isfinite(float(rho)) or float(rho) <= 0.0:
+                raise ValueError(
+                    f"Database steel density for {steel_grade!r} must be "
+                    f"finite and positive; received {rho!r}."
+                )
+            rho = float(rho)
 
         fy = self._lookup_material(steel_grade, "Yield Strength")
         if fy is None:
@@ -1465,10 +1491,7 @@ class PlateGirderBridge:
         else:
             raw_steel_density = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
             steel_density_kn_m3 = 78.5 if raw_steel_density in (None, "") else float(raw_steel_density)
-        try:
-            model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
-        except TypeError:
-            model.create_self_weight_load()
+        model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
         deck_density = self.input_dict.get(KEY_MATERIAL_DECK_DENSITY)
         if deck_density in (None, ""):
             deck_density = 25.0

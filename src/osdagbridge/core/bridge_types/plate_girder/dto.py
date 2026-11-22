@@ -105,7 +105,7 @@ class SteelProperties:
     v : float
         Poisson's ratio.
     rho : float
-        Density (kN/m^3).
+        Mass/unit-weight density value passed to the solver (N/m^3).
     Fy : float, optional
         Yield strength (Pa). Required for steel.
     E0 : float, optional

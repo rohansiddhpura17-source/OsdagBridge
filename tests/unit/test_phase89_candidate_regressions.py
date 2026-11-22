@@ -119,6 +119,69 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
         bridge._lookup_material = lambda *_: None
         self.assertEqual(bridge._build_material_props().steel_prop.rho, 80000.0)
 
+    def test_explicit_steel_density_overrides_database_grade_and_converts_units(self):
+        bridge = object.__new__(bridge_module.PlateGirderBridge)
+        bridge.input_dict = {
+            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
+            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+            KEY_MATERIAL_GIRDER_DENSITY: 85.0,
+            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
+            KEY_MATERIAL_GIRDER_POISSON: 0.3,
+            KEY_MATERIAL_GIRDER_FY: 355, KEY_MATERIAL_GIRDER_FU: 505,
+            KEY_MATERIAL_DECK_FCK: 40, KEY_MATERIAL_DECK_FCTM: 3,
+            KEY_MATERIAL_DECK_ECM: 33,
+        }
+        bridge._lookup_material = lambda grade, prop: (
+            78500.0 if prop == "Density" else
+            210e9 if prop == "Modulus of Elasticity" else
+            0.3 if prop == "Poisson's Ratio" else
+            355e6 if prop == "Yield Strength" else
+            505e6 if prop == "Ultimate Tensile Strength" else
+            40 if prop == "fck" else
+            3 if prop == "fctm" else
+            33 if prop == "Ecm" else None
+        )
+        self.assertEqual(bridge._build_material_props().steel_prop.rho, 85000.0)
+
+    def test_steel_density_defaults_to_database_or_legacy_custom_default(self):
+        bridge = object.__new__(bridge_module.PlateGirderBridge)
+        bridge.input_dict = {
+            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
+            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+        }
+        bridge._lookup_material = lambda _grade, prop: (
+            78500.0 if prop == "Density" else
+            210e9 if prop == "Modulus of Elasticity" else
+            0.3 if prop == "Poisson's Ratio" else
+            355e6 if prop == "Yield Strength" else
+            505e6 if prop == "Ultimate Tensile Strength" else
+            40 if prop == "fck" else
+            3 if prop == "fctm" else
+            33 if prop == "Ecm" else None
+        )
+        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
+
+        bridge.input_dict[KEY_GIRDER] = "custom_steel_case"
+        bridge._lookup_material = lambda *_: None
+        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
+
+    def test_invalid_explicit_steel_density_is_rejected(self):
+        bridge = object.__new__(bridge_module.PlateGirderBridge)
+        bridge.input_dict = {
+            KEY_GIRDER: "custom_steel_case", KEY_CROSS_BRACING: "E 350A",
+            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
+            KEY_MATERIAL_GIRDER_POISSON: 0.3, KEY_MATERIAL_GIRDER_FY: 355,
+            KEY_MATERIAL_GIRDER_FU: 505, KEY_MATERIAL_DECK_FCK: 40,
+            KEY_MATERIAL_DECK_FCTM: 3, KEY_MATERIAL_DECK_ECM: 33,
+        }
+        bridge._lookup_material = lambda *_: None
+        for bad_density in ("NaN", "Infinity", "not-a-number", 49.9, 120.1):
+            with self.subTest(density=bad_density):
+                bridge.input_dict[KEY_MATERIAL_GIRDER_DENSITY] = bad_density
+                with self.assertRaisesRegex(ValueError, "density must be a finite value"):
+                    bridge._build_material_props()
+
     def test_custom_steel_density_scales_self_weight_load_model(self):
         added = []
         gm = analyser_module.BridgeGrillageModel.__new__(analyser_module.BridgeGrillageModel)
@@ -130,7 +193,7 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
             add_load_case=lambda lc: added.append(lc),
         )
         gm.model = fake_model
-        gm.create_self_weight_load(steel_density_kN_m3=80.0)
+        gm.create_self_weight_load(steel_density_kN_m3=85.0)
         load_obj = added[0].load_command[0] if hasattr(added[0], "load_command") else added[0].loads_list[0] if hasattr(added[0], "loads_list") else None
         # Fallback inspection across ospgrillage LoadCase internals or create_load vertices
         with patch.object(analyser_module.og, "create_load_vertex", side_effect=lambda **kw: kw) as mock_vtx, patch.object(
@@ -138,12 +201,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
         ), patch.object(
             analyser_module.og, "create_load_case", return_value=SimpleNamespace(add_load=lambda *_: None)
         ):
-            gm.create_self_weight_load(steel_density_kN_m3=80.0)
+            gm.create_self_weight_load(steel_density_kN_m3=85.0)
             p_custom = mock_vtx.call_args_list[0].kwargs["p"]
             mock_vtx.reset_mock()
             gm.create_self_weight_load(steel_density_kN_m3=78.5)
             p_std = mock_vtx.call_args_list[0].kwargs["p"]
-        self.assertAlmostEqual(p_custom / p_std, 80.0 / 78.5, places=6)
+        self.assertAlmostEqual(p_custom / p_std, 85.0 / 78.5, places=6)
 
     def test_custom_deck_density_is_passed_to_load_model(self):
         bridge = object.__new__(bridge_module.PlateGirderBridge)
@@ -400,14 +463,14 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
         )
 
         configs = [
-            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0]),
-            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0]),
-            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0]),
-            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0]),
+            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0], 5.0),
+            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0], -5.0),
+            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0], 5.0),
+            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0], -5.0),
         ]
 
-        for n_main, edge_dist, expected_keys, line_shears_kn in configs:
-            with self.subTest(n_main=n_main, edge_dist=edge_dist):
+        for n_main, edge_dist, expected_keys, line_shears_kn, skew_deg in configs:
+            with self.subTest(n_main=n_main, edge_dist=edge_dist, skew_deg=skew_deg):
                 n_lines = len(expected_keys)
                 nodes = {}
                 elements = {}
@@ -417,11 +480,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
                 line_elems = []
                 for li in range(n_lines):
                     z = float(li * 2.0)
+                    x_shift = z * np.tan(np.deg2rad(skew_deg))
                     n_start, n_mid, n_end = nid, nid + 1, nid + 2
                     nid += 3
-                    nodes[n_start] = (0.0, 0.0, z)
-                    nodes[n_mid] = (15.0, 0.0, z)
-                    nodes[n_end] = (30.0, 0.0, z)
+                    nodes[n_start] = (x_shift, 0.0, z)
+                    nodes[n_mid] = (15.0 + x_shift, 0.0, z)
+                    nodes[n_end] = (30.0 + x_shift, 0.0, z)
                     e1, e2 = eid, eid + 1
                     eid += 2
                     elements[e1] = (n_start, n_mid)

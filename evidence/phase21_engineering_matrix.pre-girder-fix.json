@@ -1,0 +1,222 @@
+[
+  {
+    "name": "default_3g_0deg_overhang",
+    "requested_physical_girders": 3,
+    "reported_design_girders": 3,
+    "result_handler_lines": [
+      "EB1",
+      "G1",
+      "G2",
+      "G3",
+      "EB2"
+    ],
+    "physical_result_names": [
+      "G1",
+      "G2",
+      "G3"
+    ],
+    "model_longitudinal_lines": 5,
+    "edge_dist_m": 1.4,
+    "skew_deg": 0.0,
+    "steel_grade": "E 350A",
+    "steel_rho_N_m3": 78500.0,
+    "steel_density_kN_m3": 78.5,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002
+    ],
+    "total_applied_steel_girder_weight_kN": 140.59420650000004,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  },
+  {
+    "name": "custom_3g_0deg_overhang_85",
+    "requested_physical_girders": 3,
+    "reported_design_girders": 3,
+    "result_handler_lines": [
+      "EB1",
+      "G1",
+      "G2",
+      "G3",
+      "EB2"
+    ],
+    "physical_result_names": [
+      "G1",
+      "G2",
+      "G3"
+    ],
+    "model_longitudinal_lines": 5,
+    "edge_dist_m": 1.4,
+    "skew_deg": 0.0,
+    "steel_grade": "custom_steel_355_500",
+    "steel_rho_N_m3": 85000.0,
+    "steel_density_kN_m3": 85.0,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      2029.8102,
+      2029.8102,
+      2029.8102
+    ],
+    "total_applied_steel_girder_weight_kN": 152.235765,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  },
+  {
+    "name": "default_4g_0deg_overhang",
+    "requested_physical_girders": 4,
+    "reported_design_girders": 4,
+    "result_handler_lines": [
+      "EB1",
+      "G1",
+      "G2",
+      "G3",
+      "G4",
+      "EB2"
+    ],
+    "physical_result_names": [
+      "G1",
+      "G2",
+      "G3",
+      "G4"
+    ],
+    "model_longitudinal_lines": 6,
+    "edge_dist_m": 1.05,
+    "skew_deg": 0.0,
+    "steel_grade": "E 350A",
+    "steel_rho_N_m3": 78500.0,
+    "steel_density_kN_m3": 78.5,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002
+    ],
+    "total_applied_steel_girder_weight_kN": 187.45894200000004,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  },
+  {
+    "name": "default_3g_plus5deg_overhang",
+    "requested_physical_girders": 3,
+    "reported_design_girders": 3,
+    "result_handler_lines": [
+      "G1"
+    ],
+    "physical_result_names": [
+      "G1"
+    ],
+    "model_longitudinal_lines": 5,
+    "edge_dist_m": 1.4,
+    "skew_deg": 5.0,
+    "steel_grade": "E 350A",
+    "steel_rho_N_m3": 78500.0,
+    "steel_density_kN_m3": 78.5,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002
+    ],
+    "total_applied_steel_girder_weight_kN": 140.59420650000004,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  },
+  {
+    "name": "default_4g_minus5deg_overhang",
+    "requested_physical_girders": 4,
+    "reported_design_girders": 4,
+    "result_handler_lines": [
+      "G1"
+    ],
+    "physical_result_names": [
+      "G1"
+    ],
+    "model_longitudinal_lines": 6,
+    "edge_dist_m": 1.05,
+    "skew_deg": -5.0,
+    "steel_grade": "E 350A",
+    "steel_rho_N_m3": 78500.0,
+    "steel_density_kN_m3": 78.5,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002
+    ],
+    "total_applied_steel_girder_weight_kN": 187.45894200000004,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  },
+  {
+    "name": "default_3g_0deg_zero_overhang",
+    "requested_physical_girders": 3,
+    "reported_design_girders": 3,
+    "result_handler_lines": [
+      "G1",
+      "G2",
+      "G3"
+    ],
+    "physical_result_names": [
+      "G1",
+      "G2",
+      "G3"
+    ],
+    "model_longitudinal_lines": 3,
+    "edge_dist_m": 0.0,
+    "skew_deg": 0.0,
+    "steel_grade": "E 350A",
+    "steel_rho_N_m3": 78500.0,
+    "steel_density_kN_m3": 78.5,
+    "girder_section_areas_m2": [
+      0.02388012,
+      0.02388012,
+      0.02388012
+    ],
+    "girder_self_weight_line_loads_N_m": [
+      1874.5894200000002,
+      1874.5894200000002,
+      1874.5894200000002
+    ],
+    "total_applied_steel_girder_weight_kN": 140.59420650000004,
+    "edge_section_matches_full_girder": true,
+    "uls_envelope_peak_moment_kNm": null,
+    "warnings": [],
+    "status": "completed"
+  }
+]

@@ -1,0 +1,200 @@
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:648: UserWarning: No footpath component in layout; skipping footpath load creation
+  warnings.warn("No footpath component in layout; skipping footpath load creation")
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:812: UserWarning: No railing component in layout; skipping railing load creation
+  warnings.warn("No railing component in layout; skipping railing load creation")
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:895: UserWarning: No median component in layout; skipping median load creation
+  warnings.warn("No median component in layout; skipping median load creation")
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_1: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_2: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_3: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_4: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_5: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: BASIC_6: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: ACCIDENTAL_1: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: ACCIDENTAL_2: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: ACCIDENTAL_3: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: SEISMIC_1: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: SEISMIC_2: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: SEISMIC_3: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2510: UserWarning: SEISMIC_4: 'thermal_load' load case not available — create it before calling create_uls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_1: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_2: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_3: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_4: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_5: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_RARE_6: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_1: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_2: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_3: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_4: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_5: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_FREQUENT_6: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_QP_1: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/analyser.py:2705: UserWarning: SLS_QP_2: 'thermal_load' load case not available — create it before calling create_sls_combinations().
+  warnings.warn(
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py", line 790, in design
+    self._run_stage("5", self._run_dcr_checks, dataset)
+  File "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py", line 624, in _run_stage
+    result = func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py", line 2573, in _run_dcr_checks
+    _, engine, design_results = run_design_check(
+                                ^^^^^^^^^^^^^^^^^
+  File "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/designer.py", line 3242, in run_design_check
+    config = BridgeConfig.from_plate_girder_bridge(plate_girder_bridge)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Volumes/PortableSSD/OsdagBridge-screening-2026/phase21-submission-hotfix/src/osdagbridge/core/bridge_types/plate_girder/designer.py", line 311, in from_plate_girder_bridge
+    raise ValueError(
+ValueError: Gs (shear modulus) is not set for grade 'E 350A'. Populate it in the material database before running the design check.
+[INFO] osdag_latex_env module not found. LaTeX functionalities may be limited.
+[DEBUG] Bridge Layout Sizing Result:
+  overall_width = 8.4 m
+  no_of_girders = 3
+  girder_spacing = 2.8 m
+  deck_overhang = 1.4 m
+Bridge width from layout: 8.5 m
+Self weight line load @ z=1.400 m: 2029.81 N/m (A=0.02388 m²)
+Self weight line load @ z=4.250 m: 2029.81 N/m (A=0.02388 m²)
+Self weight line load @ z=7.100 m: 2029.81 N/m (A=0.02388 m²)
+Deck slab load magnitude: 6250.00 N/m²
+Wearing course load magnitude: 1200.00 N/m²
+Crash barrier line load magnitude: 6540.00 N/m
+[Crash barrier left] line load: start(x=0.000, z=0.250)  end(x=25.000, z=0.250)
+[Crash barrier right] line load: start(x=0.000, z=8.250)  end(x=25.000, z=8.250)
+Median line load magnitude: 4000.00 N/m
+Wind loads (IRC:6-2017): Pz=463.7 N/m²  FT=12.76 kN  FT/m=0.510 kN/m  FL=15.0119 N/m²  FV=695.55 N/m²
+Seismic inputs: DL=1735.4 kN  Governing LL=0.0 kN
+Seismic loads (IRC:6-2017 Cl.218): Z=0.24  Ah=0.3360  Av=0.2240
+  Feq_X=583.08 kN  Feq_Z=583.08 kN  Feq_Y=388.72 kN
+Governing LL: Case2 1xClass70R  (max |Mz_i| = 944.77 kNm)
+ULS Basic combinations:
+  Created: BASIC_1: 1.35DL + 1.75DW + 1.5LL + 0.9WL       DL=1.35(adding)  Surf=1.75  live_load leading
+  Created: BASIC_2: 1.35DL + 1.75DW + 1.15LL + 1.5WL      DL=1.35(adding)  Surf=1.75  wind_load leading
+  Created: BASIC_3: 1.35DL + 1.75DW + 1.15LL + 0.9WL      DL=1.35(adding)  Surf=1.75  thermal_load leading
+  Created: BASIC_4: 1.0DL + 1.0DW + 1.5LL + 0.9WL         DL=1.0(relieving)  Surf=1.0  live_load leading
+  Created: BASIC_5: 1.0DL + 1.0DW + 1.15LL + 1.5WL        DL=1.0(relieving)  Surf=1.0  wind_load leading
+  Created: BASIC_6: 1.0DL + 1.0DW + 1.15LL + 0.9WL        DL=1.0(relieving)  Surf=1.0  thermal_load leading
+
+ULS Accidental combinations:
+  Created: ACCIDENTAL_1: 1.0DL + 1.0DW + 0.75LL           DL=1.0  vehicle_collision(no lc)  live_load leading
+  Created: ACCIDENTAL_2: 1.0DL + 1.0DW + 0.75LL           DL=1.0  barge_impact(no lc)  live_load leading
+  Created: ACCIDENTAL_3: 1.0DL + 1.0DW + 0.75LL           DL=1.0  floating_bodies(no lc)  live_load leading
+
+ULS Seismic combinations:
+  Created: SEISMIC_1: 1.35DL + 1.75DW + 0.2LL + 1.5EL     DL=1.35(adding)  EL=1.5(service)
+  Created: SEISMIC_2: 1.35DL + 1.75DW + 0.2LL + 0.75EL    DL=1.35(adding)  EL=0.75(construction)
+  Created: SEISMIC_3: 1.0DL + 1.0DW + 0.2LL + 1.5EL       DL=1.0(relieving)  EL=1.5(service)
+  Created: SEISMIC_4: 1.0DL + 1.0DW + 0.2LL + 0.75EL      DL=1.0(relieving)  EL=0.75(construction)
+
+Total ULS combinations created: 13
+SLS Rare combinations:
+  Created: SLS_RARE_1: 1.0DL + 1.2DW + 1.0LL + 0.6WL      DL=1.0  Surf=1.2(adding)  live_load leading
+  Created: SLS_RARE_2: 1.0DL + 1.2DW + 0.75LL + 1.0WL     DL=1.0  Surf=1.2(adding)  wind_load leading
+  Created: SLS_RARE_3: 1.0DL + 1.2DW + 0.75LL + 0.6WL     DL=1.0  Surf=1.2(adding)  thermal_load leading
+  Created: SLS_RARE_4: 1.0DL + 1.0DW + 1.0LL + 0.6WL      DL=1.0  Surf=1.0(relieving)  live_load leading
+  Created: SLS_RARE_5: 1.0DL + 1.0DW + 0.75LL + 1.0WL     DL=1.0  Surf=1.0(relieving)  wind_load leading
+  Created: SLS_RARE_6: 1.0DL + 1.0DW + 0.75LL + 0.6WL     DL=1.0  Surf=1.0(relieving)  thermal_load leading
+
+SLS Frequent combinations:
+  Created: SLS_FREQUENT_1: 1.0DL + 1.2DW + 0.75LL + 0.5WL  DL=1.0  Surf=1.2(adding)  live_load leading
+  Created: SLS_FREQUENT_2: 1.0DL + 1.2DW + 0.2LL + 0.6WL  DL=1.0  Surf=1.2(adding)  wind_load leading
+  Created: SLS_FREQUENT_3: 1.0DL + 1.2DW + 0.2LL + 0.5WL  DL=1.0  Surf=1.2(adding)  thermal_load leading
+  Created: SLS_FREQUENT_4: 1.0DL + 1.0DW + 0.75LL + 0.5WL  DL=1.0  Surf=1.0(relieving)  live_load leading
+  Created: SLS_FREQUENT_5: 1.0DL + 1.0DW + 0.2LL + 0.6WL  DL=1.0  Surf=1.0(relieving)  wind_load leading
+  Created: SLS_FREQUENT_6: 1.0DL + 1.0DW + 0.2LL + 0.5WL  DL=1.0  Surf=1.0(relieving)  thermal_load leading
+
+SLS Quasi-permanent combinations:
+  Created: SLS_QP_1: 1.0DL + 1.2DW                        DL=1.0  Surf=1.2(adding)  TL=0.5
+  Created: SLS_QP_2: 1.0DL + 1.0DW                        DL=1.0  Surf=1.0(relieving)  TL=0.5
+
+Total SLS combinations created: 14
+Envelope ULS (worst signed magnitude) over 13 combinations: peak |Mz_i|=2727.62 kNm  peak |dy|=103.39 mm
+Envelope SLS (worst signed magnitude) over 14 combinations: peak |Mz_i|=1915.85 kNm  peak |dy|=72.78 mm
+
+------------------------------------------------------------
+  PLATE GIRDER BRIDGE - DESIGN SUMMARY
+------------------------------------------------------------
+  Span                  : 25.0 m
+  Overall width         : 8.400 m
+  No. of girders        : 3
+  Girder spacing        : 2800.0 mm
+  Deck overhang         : 1400.0 mm
+
+------------------------------------------------------------
+  GIRDER G1 CROSS-SECTION (mm) / PROPERTIES (SI)
+------------------------------------------------------------
+  Total depth      D    : 1390.0
+  Web depth        d_w  : 1355.0
+  Web thickness    t_w  : 8.0
+  Top flange width B_ft : 420.0
+  Top flange thk   T_ft : 18.0
+  Bot flange width B_fb : 420.0
+  Bot flange thk   T_fb : 18.0
+  Area   A  : 0.023880 m^2
+  I_z       : 0.008328 m^4
+  I_y       : 0.000216 m^4
+  I_t (J)   : 0.000002 m^3
+------------------------------------------------------------
+------------------------------------------------------------
+  GIRDER G2 CROSS-SECTION (mm) / PROPERTIES (SI)
+------------------------------------------------------------
+  Total depth      D    : 1390.0
+  Web depth        d_w  : 1355.0
+  Web thickness    t_w  : 8.0
+  Top flange width B_ft : 420.0
+  Top flange thk   T_ft : 18.0
+  Bot flange width B_fb : 420.0
+  Bot flange thk   T_fb : 18.0
+  Area   A  : 0.023880 m^2
+  I_z       : 0.008328 m^4
+  I_y       : 0.000216 m^4
+  I_t (J)   : 0.000002 m^3
+------------------------------------------------------------
+------------------------------------------------------------
+  GIRDER G3 CROSS-SECTION (mm) / PROPERTIES (SI)
+------------------------------------------------------------
+  Total depth      D    : 1390.0
+  Web depth        d_w  : 1355.0
+  Web thickness    t_w  : 8.0
+  Top flange width B_ft : 420.0
+  Top flange thk   T_ft : 18.0
+  Bot flange width B_fb : 420.0
+  Bot flange thk   T_fb : 18.0
+  Area   A  : 0.023880 m^2
+  I_z       : 0.008328 m^4
+  I_y       : 0.000216 m^4
+  I_t (J)   : 0.000002 m^3
+------------------------------------------------------------
+============================================================
+  IRC 22:2015 DESIGN CHECK PIPELINE
+============================================================
+
+[Step 1] Loading bridge configuration ...

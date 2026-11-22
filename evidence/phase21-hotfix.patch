@@ -1,0 +1,1121 @@
+.../bridge_types/plate_girder/analysis_results.py  |  82 +++++----
+ .../core/bridge_types/plate_girder/dto.py          |   2 +-
+ .../bridge_types/plate_girder/plategirderbridge.py |  41 ++++-
+ .../integration/run_phase21_engineering_matrix.py  | 187 +++++++++++++++++++++
+ tests/integration/run_phase21_report.py            |  91 ++++++++++
+ tests/unit/test_phase89_candidate_regressions.py   |  88 ++++++++--
+ 6 files changed, 440 insertions(+), 51 deletions(-)
+
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py b/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
+index 97c06d9..d18f750 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
+@@ -446,37 +446,59 @@ class PlateGirderAnalysisResults:
+     def build_girders(self, verbose=True):
+ 
+         nodes, elements, adj = self.build_grillage_connectivity()
++        # Global min/max X do not identify all girder endpoints on a skewed
++        # bridge: each transverse grid line is longitudinally offset. Group
++        # longitudinal elements by their constant Z coordinate, then walk each
++        # line in X order so every physical girder and edge line is retained.
++        lines = defaultdict(list)
++        for eid, conn in elements.items():
++            if len(conn) != 2:
++                continue
++            n1, n2 = conn
++            z1 = float(nodes[n1][2])
++            z2 = float(nodes[n2][2])
++            if abs(z1 - z2) <= 1e-6:
++                lines[round((z1 + z2) / 2.0, 6)].append(eid)
++
++        ordered_lines = []
++        for z, eids in sorted(lines.items()):
++            ordered_eids = sorted(
++                eids,
++                key=lambda eid: min(float(nodes[n][0]) for n in elements[eid]),
++            )
++            path = []
++            for eid in ordered_eids:
++                n1, n2 = elements[eid]
++                if not path:
++                    # Start at the smaller X endpoint regardless of element
++                    # orientation in the active OpenSees domain.
++                    start, end = sorted((n1, n2), key=lambda n: float(nodes[n][0]))
++                    path.extend((start, end))
++                elif path[-1] == n1:
++                    path.append(n2)
++                elif path[-1] == n2:
++                    path.append(n1)
++                else:
++                    raise ValueError(
++                        f"Longitudinal line at z={z:g} m is disconnected before element {eid}."
++                    )
++            if path:
++                ordered_lines.append((z, ordered_eids, path))
+ 
+-        # AUTO EXTRACT START / END
+-        x_coords = {n: coord[0] for n, coord in nodes.items()}
+-
+-        min_x = min(x_coords.values())
+-        max_x = max(x_coords.values())
+-
+-        start_nodes = [n for n, x in x_coords.items() if x == min_x]
+-        end_nodes = [n for n, x in x_coords.items() if x == max_x]
+-
+-        start_nodes.sort(key=lambda n: nodes[n][2])
+-        end_nodes.sort(key=lambda n: nodes[n][2])
+-
+-        if verbose:
+-            print("\nStart edge nodes :", start_nodes)
+-            print("End edge nodes   :", end_nodes)
+-
+-        # span length
+-        x_coords = [c[0] for c in nodes.values()]
+-        span_length = max(x_coords) - min(x_coords)
++        if not ordered_lines:
++            raise ValueError("No longitudinal girder lines were found in the active model.")
+ 
+         if verbose:
+-            print(f"\nSpan length from geometry = {span_length}\n")
++            print("\nLongitudinal lines (z, first node, last node):", [
++                (z, path[0], path[-1]) for z, _eids, path in ordered_lines
++            ])
+ 
+         girder_map = {}
+-        all_pairs = list(zip(start_nodes, end_nodes))
+-        num_pairs = len(all_pairs)
++        num_pairs = len(ordered_lines)
+ 
+         has_edge_beams = (self.edge_dist > 0) and (num_pairs >= 3)
+         main_idx = 0
+-        for i, (s, e) in enumerate(all_pairs, start=1):
++        for i, (z, line_eids, path) in enumerate(ordered_lines, start=1):
+             # --- NAMING LOGIC ---
+             # When deck overhang edge beams exist, label the outermost two
+             # longitudinal lines EB1/EB2 and number the structural main
+@@ -490,11 +512,13 @@ class PlateGirderAnalysisResults:
+                 main_idx += 1
+                 name = f"G{main_idx}"
+ 
+-            path = self.bfs_shortest_path(adj, s, e)
+-            path_elements, element_map = self.get_elements_along_path(path, elements)
++            path_elements = list(line_eids)
++            element_map = [
++                (eid, path[j], path[j + 1])
++                for j, eid in enumerate(path_elements)
++            ]
+             length = self.compute_path_distance(nodes, path)
+-
+-            status = "VERIFIED" if abs(length - span_length) < 1e-6 else "NOT MATCHING"
++            status = "CONNECTED" if length > 0.0 else "DISCONNECTED"
+ 
+             if verbose:
+                 print("----------------------------------------")
+@@ -512,8 +536,8 @@ class PlateGirderAnalysisResults:
+                 print("----------------------------------------\n")
+ 
+             girder_map[name] = {
+-                "start": s,
+-                "end": e,
++                "start": path[0],
++                "end": path[-1],
+                 "path": path,
+                 "elements": path_elements,
+                 "element_map": element_map,
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/dto.py b/src/osdagbridge/core/bridge_types/plate_girder/dto.py
+index 9947d74..65bc884 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/dto.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/dto.py
+@@ -105,7 +105,7 @@ class SteelProperties:
+     v : float
+         Poisson's ratio.
+     rho : float
+-        Density (kN/m^3).
++        Mass/unit-weight density value passed to the solver (N/m^3).
+     Fy : float, optional
+         Yield strength (Pa). Required for steel.
+     E0 : float, optional
+diff --git a/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py b/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
+index d994f54..7c295de 100644
+--- a/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
++++ b/src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
+@@ -2,6 +2,7 @@ from __future__ import annotations
+ import sqlite3
+ import types
+ from pathlib import Path
++from math import isfinite
+ from .ui_fields import FrontendData
+ from .dto import (
+     ConcreteProperties,
+@@ -1316,11 +1317,36 @@ class PlateGirderBridge:
+             raw_v = self.input_dict.get(KEY_MATERIAL_GIRDER_POISSON)
+             v = float(raw_v) if raw_v not in (None, "") else 0.3
+ 
+-        rho = self._lookup_material(steel_grade, "Density")
+-        if rho is None:
+-            raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
+-            rho = (float(raw_rho) * 1000.0
+-                   if raw_rho not in (None, "") else _DEFAULT_DENSITY)
++        # The material dialog's density is an explicit override for every grade,
++        # including database grades. It is expressed in kN/m³; SteelProperties
++        # and the grillage material API use N/m³.
++        raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
++        if raw_rho not in (None, ""):
++            try:
++                rho_kN_m3 = float(raw_rho)
++            except (TypeError, ValueError, OverflowError) as exc:
++                raise ValueError(
++                    f"Girder steel density must be a finite value between "
++                    f"50 and 120 kN/m³; received {raw_rho!r}."
++                ) from exc
++            if not isfinite(rho_kN_m3) or not 50.0 <= rho_kN_m3 <= 120.0:
++                raise ValueError(
++                    f"Girder steel density must be a finite value between "
++                    f"50 and 120 kN/m³; received {raw_rho!r}."
++                )
++            rho = rho_kN_m3 * 1000.0
++        else:
++            # Keep each database grade's value when no explicit UI/OSI value
++            # was supplied; custom materials retain the established default.
++            rho = self._lookup_material(steel_grade, "Density")
++            if rho is None:
++                rho = _DEFAULT_DENSITY
++            if not isfinite(float(rho)) or float(rho) <= 0.0:
++                raise ValueError(
++                    f"Database steel density for {steel_grade!r} must be "
++                    f"finite and positive; received {rho!r}."
++                )
++            rho = float(rho)
+ 
+         fy = self._lookup_material(steel_grade, "Yield Strength")
+         if fy is None:
+@@ -1465,10 +1491,7 @@ class PlateGirderBridge:
+         else:
+             raw_steel_density = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
+             steel_density_kn_m3 = 78.5 if raw_steel_density in (None, "") else float(raw_steel_density)
+-        try:
+-            model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
+-        except TypeError:
+-            model.create_self_weight_load()
++        model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
+         deck_density = self.input_dict.get(KEY_MATERIAL_DECK_DENSITY)
+         if deck_density in (None, ""):
+             deck_density = 25.0
+diff --git a/tests/integration/run_phase21_engineering_matrix.py b/tests/integration/run_phase21_engineering_matrix.py
+new file mode 100644
+index 0000000..fe63cc0
+--- /dev/null
++++ b/tests/integration/run_phase21_engineering_matrix.py
+@@ -0,0 +1,187 @@
++"""Run real OpenSees designs for the Phase 21 density/girder review.
++
++Execute from the repository root with the Osdag Python 3.12 environment and
++``PYTHONPATH=src``. The script uses the production bridge backend and solver;
++it writes only into the supplied Phase 21 evidence directory.
++"""
++from __future__ import annotations
++
++import json
++import sys
++import traceback
++import warnings
++from copy import deepcopy
++from pathlib import Path
++
++from osdagbridge.core.bridge_types.plate_girder.defaults import (
++    BASIC_INPUT_DICT,
++    solve_extend_basic_input_dict,
++)
++from osdagbridge.core.bridge_types.plate_girder.plategirderbridge import PlateGirderBridge
++from osdagbridge.core.utils.common import (
++    KEY_CARRIAGEWAY_WIDTH,
++    KEY_GIRDER,
++    KEY_MATERIAL_DECK_DENSITY,
++    KEY_MATERIAL_DECK_ECM,
++    KEY_MATERIAL_DECK_FCK,
++    KEY_MATERIAL_DECK_FCTM,
++    KEY_MATERIAL_GIRDER_DENSITY,
++    KEY_MATERIAL_GIRDER_E,
++    KEY_MATERIAL_GIRDER_FU,
++    KEY_MATERIAL_GIRDER_FY,
++    KEY_MATERIAL_GIRDER_G,
++    KEY_MATERIAL_GIRDER_POISSON,
++    KEY_PROJECT_LOCATION,
++    KEY_SKEW_ANGLE,
++    KEY_SPAN,
++    KEY_TS_DECK_OVERHANG,
++    KEY_TS_GIRDER_SPACING,
++    KEY_TS_NO_OF_GIRDERS,
++    KEY_TS_OVERALL_WIDTH,
++)
++
++
++LOCATION = {
++    "state": "Delhi",
++    "district": "New Delhi",
++    "weather_data": {
++        "zone": "IV",
++        "z_value": 0.24,
++        "wind_speed": 47.0,
++        "max_temp": 65.0,
++        "min_temp": -10.0,
++    },
++}
++
++CASES = (
++    {"name": "default_3g_0deg_overhang", "girders": 3, "skew": 0.0, "density": 78.5},
++    {"name": "custom_3g_0deg_overhang_85", "girders": 3, "skew": 0.0, "density": 85.0, "custom": True},
++    {"name": "default_4g_0deg_overhang", "girders": 4, "skew": 0.0, "density": 78.5},
++    {"name": "default_3g_plus5deg_overhang", "girders": 3, "skew": 5.0, "density": 78.5},
++    {"name": "default_4g_minus5deg_overhang", "girders": 4, "skew": -5.0, "density": 78.5},
++    {"name": "default_3g_0deg_zero_overhang", "girders": 3, "skew": 0.0, "density": 78.5, "zero_overhang": True},
++)
++
++
++def build_inputs(case: dict) -> dict:
++    data = deepcopy(BASIC_INPUT_DICT)
++    data.update({
++        KEY_SPAN: 25.0,
++        KEY_CARRIAGEWAY_WIDTH: 7.5,
++        KEY_PROJECT_LOCATION: deepcopy(LOCATION),
++        KEY_SKEW_ANGLE: float(case["skew"]),
++        KEY_TS_NO_OF_GIRDERS: int(case["girders"]),
++        KEY_MATERIAL_GIRDER_DENSITY: float(case["density"]),
++        KEY_MATERIAL_GIRDER_G: 76.923,
++        KEY_MATERIAL_DECK_DENSITY: 25.0,
++        KEY_MATERIAL_DECK_FCK: 40.0,
++        KEY_MATERIAL_DECK_FCTM: 3.5,
++        KEY_MATERIAL_DECK_ECM: 34.0,
++    })
++    if case.get("custom"):
++        data.update({
++            KEY_GIRDER: "custom_steel_355_500",
++            KEY_MATERIAL_GIRDER_E: 210.0,
++            KEY_MATERIAL_GIRDER_G: 80.769,
++            KEY_MATERIAL_GIRDER_FY: 355.0,
++            KEY_MATERIAL_GIRDER_FU: 500.0,
++            KEY_MATERIAL_GIRDER_POISSON: 0.3,
++        })
++    solve_extend_basic_input_dict(data)
++    if case.get("zero_overhang"):
++        data[KEY_TS_DECK_OVERHANG] = 0.0
++        data[KEY_TS_GIRDER_SPACING] = float(data[KEY_TS_OVERALL_WIDTH]) / (int(case["girders"]) - 1)
++    return data
++
++
++def run_case(case: dict) -> dict:
++    bridge = PlateGirderBridge()
++    inputs = build_inputs(case)
++    bridge.set_input(inputs)
++    with warnings.catch_warnings(record=True) as caught_warnings:
++        warnings.simplefilter("always")
++        bridge.design()
++
++    result_handler = bridge.get_result_handler()
++    girder_map, _ = result_handler.build_girders(verbose=False)
++    physical_names = [name for name in girder_map if name.startswith("G")]
++    expected_physical = [f"G{i}" for i in range(1, int(case["girders"]) + 1)]
++    expected_lines = (
++        ["EB1", *expected_physical, "EB2"]
++        if float(bridge.grillage_geometry.edge_dist) > 0.0
++        else expected_physical
++    )
++    report_per_girder = list(bridge.design_results.get("per_girder", {}))
++    cache_per_girder = list(getattr(bridge, "_load_effects_cache", {}))
++    if (
++        list(girder_map) != expected_lines
++        or physical_names != expected_physical
++        or int(bridge.design_results.get("n_girders", -1)) != int(case["girders"])
++        or report_per_girder != expected_physical
++        or cache_per_girder != expected_physical
++    ):
++        raise AssertionError({
++            "expected_lines": expected_lines,
++            "result_handler_lines": list(girder_map),
++            "expected_physical": expected_physical,
++            "report_per_girder": report_per_girder,
++            "cache_per_girder": cache_per_girder,
++            "reported_design_girders": bridge.design_results.get("n_girders"),
++        })
++    actual_rho = float(bridge.material_props.steel_prop.rho)
++    density_kn_m3 = actual_rho / 1000.0
++    main_sections = list(bridge.grillage_model.steel_girder_props)
++    line_loads_n_m = [sec.A * density_kn_m3 * 1000.0 for sec in main_sections]
++    expected_total_girder_weight_kN = sum(line_loads_n_m) * float(inputs[KEY_SPAN]) / 1000.0
++    edge_props = bridge.grillage_model.edge_longitudinal_props
++    representative = main_sections[0]
++    edge_section_matches_full_girder = all(
++        abs(float(getattr(edge_props, field)) - float(getattr(representative, field))) < 1e-12
++        for field in ("A", "J", "Iz", "Iy", "Az", "Ay")
++    )
++
++    record = {
++        "name": case["name"],
++        "requested_physical_girders": int(case["girders"]),
++        "reported_design_girders": int(bridge.design_results.get("n_girders", -1)),
++        "result_handler_lines": list(girder_map),
++        "physical_result_names": physical_names,
++        "report_per_girder_names": report_per_girder,
++        "load_effect_cache_girder_names": cache_per_girder,
++        "model_longitudinal_lines": int(bridge.grillage_geometry.n_l),
++        "edge_dist_m": float(bridge.grillage_geometry.edge_dist),
++        "skew_deg": float(inputs[KEY_SKEW_ANGLE]),
++        "steel_grade": str(inputs[KEY_GIRDER]),
++        "steel_rho_N_m3": actual_rho,
++        "steel_density_kN_m3": density_kn_m3,
++        "girder_section_areas_m2": [float(sec.A) for sec in main_sections],
++        "girder_self_weight_line_loads_N_m": line_loads_n_m,
++        "total_applied_steel_girder_weight_kN": expected_total_girder_weight_kN,
++        "edge_section_matches_full_girder": edge_section_matches_full_girder,
++        "python_warnings": [str(item.message) for item in caught_warnings],
++    }
++    bridge.memory.release()
++    return record
++
++
++def main() -> int:
++    output_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("evidence/phase21_engineering_matrix.json")
++    results = []
++    for case in CASES:
++        try:
++            result = run_case(case)
++            result["status"] = "completed"
++            print("CASE_RESULT", json.dumps(result, sort_keys=True), flush=True)
++            results.append(result)
++        except Exception as exc:
++            result = {"name": case["name"], "status": "failed", "error": str(exc), "traceback": traceback.format_exc()}
++            print("CASE_FAILURE", json.dumps(result, sort_keys=True), flush=True)
++            results.append(result)
++    output_path.parent.mkdir(parents=True, exist_ok=True)
++    output_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
++    failures = [row for row in results if row["status"] != "completed"]
++    return 1 if failures else 0
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/integration/run_phase21_report.py b/tests/integration/run_phase21_report.py
+new file mode 100644
+index 0000000..df432e3
+--- /dev/null
++++ b/tests/integration/run_phase21_report.py
+@@ -0,0 +1,91 @@
++"""Generate a real backend report through the app pipeline using Tectonic."""
++from __future__ import annotations
++
++import json
++import importlib.util
++import os
++from pathlib import Path
++import shutil
++import subprocess
++import sys
++
++from osdagbridge.core.bridge_types.plate_girder.plategirderbridge import PlateGirderBridge
++from osdagbridge.core.reports.report_generator import (
++    ReportMetadata,
++    ReportOptions,
++    ReportRequest,
++)
++
++
++TECTONIC = os.environ.get("TECTONIC") or shutil.which("tectonic") or (
++    "/Users/rohansiddhpura/.cache/codex-runtimes/codex-primary-runtime/"
++    "dependencies/bin/override/tectonic"
++)
++ORIGINAL_RUN = subprocess.run
++MATRIX_SPEC = importlib.util.spec_from_file_location(
++    "phase21_engineering_matrix", Path(__file__).with_name("run_phase21_engineering_matrix.py")
++)
++MATRIX = importlib.util.module_from_spec(MATRIX_SPEC)
++MATRIX_SPEC.loader.exec_module(MATRIX)
++
++
++def tectonic_compat(command, **kwargs):
++    """Translate the report generator's pdflatex invocation to real Tectonic."""
++    if isinstance(command, (list, tuple)) and len(command) == 3 and command[1] == "-interaction=nonstopmode":
++        tex_file = command[2]
++        tectonic_command = [TECTONIC, "--color", "never", "-o", kwargs["cwd"], tex_file]
++        return ORIGINAL_RUN(tectonic_command, **kwargs)
++    return ORIGINAL_RUN(command, **kwargs)
++
++
++def main() -> int:
++    outdir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("evidence/generated-phase21-report")
++    outdir.mkdir(parents=True, exist_ok=True)
++    case = next(item for item in MATRIX.CASES if item["name"] == "custom_3g_0deg_overhang_85")
++    bridge = PlateGirderBridge()
++    bridge.set_input(MATRIX.build_inputs(case))
++    bridge.design()
++
++    request = ReportRequest(
++        metadata=ReportMetadata(
++            project_name="Phase 21 density regression",
++            project_location="Local solver verification",
++            designer="FOSSEE OsdagBridge QA",
++            client="Regression fixture",
++            company="FOSSEE IIT Bombay",
++            report_date="2026-11-23",
++        ),
++        options=ReportOptions(
++            sections=["loads", "analysis", "design_checks"],
++            include_figures=False,
++            include_toc=True,
++            include_pdf=True,
++        ),
++        output_dir=str(outdir),
++        file_stem="phase21-density-85",
++    )
++    subprocess.run = tectonic_compat
++    try:
++        report_result = bridge.generate_design_report(request, None)
++    finally:
++        subprocess.run = ORIGINAL_RUN
++
++    result = {
++        "pdf_path": report_result.pdf_path,
++        "tex_path": report_result.tex_path,
++        "pdf_exists": bool(report_result.pdf_path and Path(report_result.pdf_path).is_file()),
++        "tex_exists": bool(report_result.tex_path and Path(report_result.tex_path).is_file()),
++        "compiler": TECTONIC,
++        "backend_density_N_m3": float(bridge.material_props.steel_prop.rho),
++        "backend_design_girders": int(bridge.design_results.get("n_girders", -1)),
++        "report_per_girder_keys": list(bridge.design_results.get("per_girder", {})),
++        "status": "completed" if report_result.pdf_path and Path(report_result.pdf_path).is_file() else "failed",
++    }
++    Path(outdir, "phase21-report-result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
++    print(json.dumps(result, indent=2))
++    bridge.memory.release()
++    return 0 if result["status"] == "completed" else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+diff --git a/tests/unit/test_phase89_candidate_regressions.py b/tests/unit/test_phase89_candidate_regressions.py
+index 830436b..21a0b08 100644
+--- a/tests/unit/test_phase89_candidate_regressions.py
++++ b/tests/unit/test_phase89_candidate_regressions.py
+@@ -119,6 +119,69 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+         bridge._lookup_material = lambda *_: None
+         self.assertEqual(bridge._build_material_props().steel_prop.rho, 80000.0)
+ 
++    def test_explicit_steel_density_overrides_database_grade_and_converts_units(self):
++        bridge = object.__new__(bridge_module.PlateGirderBridge)
++        bridge.input_dict = {
++            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
++            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
++            KEY_MATERIAL_GIRDER_DENSITY: 85.0,
++            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
++            KEY_MATERIAL_GIRDER_POISSON: 0.3,
++            KEY_MATERIAL_GIRDER_FY: 355, KEY_MATERIAL_GIRDER_FU: 505,
++            KEY_MATERIAL_DECK_FCK: 40, KEY_MATERIAL_DECK_FCTM: 3,
++            KEY_MATERIAL_DECK_ECM: 33,
++        }
++        bridge._lookup_material = lambda grade, prop: (
++            78500.0 if prop == "Density" else
++            210e9 if prop == "Modulus of Elasticity" else
++            0.3 if prop == "Poisson's Ratio" else
++            355e6 if prop == "Yield Strength" else
++            505e6 if prop == "Ultimate Tensile Strength" else
++            40 if prop == "fck" else
++            3 if prop == "fctm" else
++            33 if prop == "Ecm" else None
++        )
++        self.assertEqual(bridge._build_material_props().steel_prop.rho, 85000.0)
++
++    def test_steel_density_defaults_to_database_or_legacy_custom_default(self):
++        bridge = object.__new__(bridge_module.PlateGirderBridge)
++        bridge.input_dict = {
++            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
++            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
++        }
++        bridge._lookup_material = lambda _grade, prop: (
++            78500.0 if prop == "Density" else
++            210e9 if prop == "Modulus of Elasticity" else
++            0.3 if prop == "Poisson's Ratio" else
++            355e6 if prop == "Yield Strength" else
++            505e6 if prop == "Ultimate Tensile Strength" else
++            40 if prop == "fck" else
++            3 if prop == "fctm" else
++            33 if prop == "Ecm" else None
++        )
++        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
++
++        bridge.input_dict[KEY_GIRDER] = "custom_steel_case"
++        bridge._lookup_material = lambda *_: None
++        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
++
++    def test_invalid_explicit_steel_density_is_rejected(self):
++        bridge = object.__new__(bridge_module.PlateGirderBridge)
++        bridge.input_dict = {
++            KEY_GIRDER: "custom_steel_case", KEY_CROSS_BRACING: "E 350A",
++            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
++            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
++            KEY_MATERIAL_GIRDER_POISSON: 0.3, KEY_MATERIAL_GIRDER_FY: 355,
++            KEY_MATERIAL_GIRDER_FU: 505, KEY_MATERIAL_DECK_FCK: 40,
++            KEY_MATERIAL_DECK_FCTM: 3, KEY_MATERIAL_DECK_ECM: 33,
++        }
++        bridge._lookup_material = lambda *_: None
++        for bad_density in ("NaN", "Infinity", "not-a-number", 49.9, 120.1):
++            with self.subTest(density=bad_density):
++                bridge.input_dict[KEY_MATERIAL_GIRDER_DENSITY] = bad_density
++                with self.assertRaisesRegex(ValueError, "density must be a finite value"):
++                    bridge._build_material_props()
++
+     def test_custom_steel_density_scales_self_weight_load_model(self):
+         added = []
+         gm = analyser_module.BridgeGrillageModel.__new__(analyser_module.BridgeGrillageModel)
+@@ -130,7 +193,7 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+             add_load_case=lambda lc: added.append(lc),
+         )
+         gm.model = fake_model
+-        gm.create_self_weight_load(steel_density_kN_m3=80.0)
++        gm.create_self_weight_load(steel_density_kN_m3=85.0)
+         load_obj = added[0].load_command[0] if hasattr(added[0], "load_command") else added[0].loads_list[0] if hasattr(added[0], "loads_list") else None
+         # Fallback inspection across ospgrillage LoadCase internals or create_load vertices
+         with patch.object(analyser_module.og, "create_load_vertex", side_effect=lambda **kw: kw) as mock_vtx, patch.object(
+@@ -138,12 +201,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+         ), patch.object(
+             analyser_module.og, "create_load_case", return_value=SimpleNamespace(add_load=lambda *_: None)
+         ):
+-            gm.create_self_weight_load(steel_density_kN_m3=80.0)
++            gm.create_self_weight_load(steel_density_kN_m3=85.0)
+             p_custom = mock_vtx.call_args_list[0].kwargs["p"]
+             mock_vtx.reset_mock()
+             gm.create_self_weight_load(steel_density_kN_m3=78.5)
+             p_std = mock_vtx.call_args_list[0].kwargs["p"]
+-        self.assertAlmostEqual(p_custom / p_std, 80.0 / 78.5, places=6)
++        self.assertAlmostEqual(p_custom / p_std, 85.0 / 78.5, places=6)
+ 
+     def test_custom_deck_density_is_passed_to_load_model(self):
+         bridge = object.__new__(bridge_module.PlateGirderBridge)
+@@ -400,14 +463,14 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+         )
+ 
+         configs = [
+-            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0]),
+-            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0]),
+-            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0]),
+-            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0]),
++            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0], 5.0),
++            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0], -5.0),
++            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0], 5.0),
++            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0], -5.0),
+         ]
+ 
+-        for n_main, edge_dist, expected_keys, line_shears_kn in configs:
+-            with self.subTest(n_main=n_main, edge_dist=edge_dist):
++        for n_main, edge_dist, expected_keys, line_shears_kn, skew_deg in configs:
++            with self.subTest(n_main=n_main, edge_dist=edge_dist, skew_deg=skew_deg):
+                 n_lines = len(expected_keys)
+                 nodes = {}
+                 elements = {}
+@@ -417,11 +480,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+                 line_elems = []
+                 for li in range(n_lines):
+                     z = float(li * 2.0)
++                    x_shift = z * np.tan(np.deg2rad(skew_deg))
+                     n_start, n_mid, n_end = nid, nid + 1, nid + 2
+                     nid += 3
+-                    nodes[n_start] = (0.0, 0.0, z)
+-                    nodes[n_mid] = (15.0, 0.0, z)
+-                    nodes[n_end] = (30.0, 0.0, z)
++                    nodes[n_start] = (x_shift, 0.0, z)
++                    nodes[n_mid] = (15.0 + x_shift, 0.0, z)
++                    nodes[n_end] = (30.0 + x_shift, 0.0, z)
+                     e1, e2 = eid, eid + 1
+                     eid += 2
+                     elements[e1] = (n_start, n_mid)
+
+Changes:
+
+src/osdagbridge/core/bridge_types/plate_girder/analysis_results.py
+  @@ -446,37 +446,59 @@ class PlateGirderAnalysisResults:
+  +        # Global min/max X do not identify all girder endpoints on a skewed
+  +        # bridge: each transverse grid line is longitudinally offset. Group
+  +        # longitudinal elements by their constant Z coordinate, then walk each
+  +        # line in X order so every physical girder and edge line is retained.
+  +        lines = defaultdict(list)
+  +        for eid, conn in elements.items():
+  +            if len(conn) != 2:
+  +                continue
+  +            n1, n2 = conn
+  +            z1 = float(nodes[n1][2])
+  +            z2 = float(nodes[n2][2])
+  +            if abs(z1 - z2) <= 1e-6:
+  +                lines[round((z1 + z2) / 2.0, 6)].append(eid)
+  +
+  +        ordered_lines = []
+  +        for z, eids in sorted(lines.items()):
+  +            ordered_eids = sorted(
+  +                eids,
+  +                key=lambda eid: min(float(nodes[n][0]) for n in elements[eid]),
+  +            )
+  +            path = []
+  +            for eid in ordered_eids:
+  +                n1, n2 = elements[eid]
+  +                if not path:
+  +                    # Start at the smaller X endpoint regardless of element
+  +                    # orientation in the active OpenSees domain.
+  +                    start, end = sorted((n1, n2), key=lambda n: float(nodes[n][0]))
+  +                    path.extend((start, end))
+  +                elif path[-1] == n1:
+  +                    path.append(n2)
+  +                elif path[-1] == n2:
+  +                    path.append(n1)
+  +                else:
+  +                    raise ValueError(
+  +                        f"Longitudinal line at z={z:g} m is disconnected before element {eid}."
+  +                    )
+  +            if path:
+  +                ordered_lines.append((z, ordered_eids, path))
+   
+  -        # AUTO EXTRACT START / END
+  -        x_coords = {n: coord[0] for n, coord in nodes.items()}
+  -
+  -        min_x = min(x_coords.values())
+  -        max_x = max(x_coords.values())
+  -
+  -        start_nodes = [n for n, x in x_coords.items() if x == min_x]
+  -        end_nodes = [n for n, x in x_coords.items() if x == max_x]
+  -
+  -        start_nodes.sort(key=lambda n: nodes[n][2])
+  -        end_nodes.sort(key=lambda n: nodes[n][2])
+  -
+  -        if verbose:
+  -            print("\nStart edge nodes :", start_nodes)
+  -            print("End edge nodes   :", end_nodes)
+  -
+  -        # span length
+  -        x_coords = [c[0] for c in nodes.values()]
+  -        span_length = max(x_coords) - min(x_coords)
+  +        if not ordered_lines:
+  +            raise ValueError("No longitudinal girder lines were found in the active model.")
+   
+           if verbose:
+  -            print(f"\nSpan length from geometry = {span_length}\n")
+  +            print("\nLongitudinal lines (z, first node, last node):", [
+  +                (z, path[0], path[-1]) for z, _eids, path in ordered_lines
+  +            ])
+   
+           girder_map = {}
+  -        all_pairs = list(zip(start_nodes, end_nodes))
+  -        num_pairs = len(all_pairs)
+  +        num_pairs = len(ordered_lines)
+   
+           has_edge_beams = (self.edge_dist > 0) and (num_pairs >= 3)
+           main_idx = 0
+  -        for i, (s, e) in enumerate(all_pairs, start=1):
+  +        for i, (z, line_eids, path) in enumerate(ordered_lines, start=1):
+               # --- NAMING LOGIC ---
+               # When deck overhang edge beams exist, label the outermost two
+               # longitudinal lines EB1/EB2 and number the structural main
+  @@ -490,11 +512,13 @@ class PlateGirderAnalysisResults:
+  -            path = self.bfs_shortest_path(adj, s, e)
+  -            path_elements, element_map = self.get_elements_along_path(path, elements)
+  +            path_elements = list(line_eids)
+  +            element_map = [
+  +                (eid, path[j], path[j + 1])
+  +                for j, eid in enumerate(path_elements)
+  +            ]
+               length = self.compute_path_distance(nodes, path)
+  -
+  -            status = "VERIFIED" if abs(length - span_length) < 1e-6 else "NOT MATCHING"
+  +            status = "CONNECTED" if length > 0.0 else "DISCONNECTED"
+   
+               if verbose:
+                   print("----------------------------------------")
+  @@ -512,8 +536,8 @@ class PlateGirderAnalysisResults:
+  -                "start": s,
+  -                "end": e,
+  +                "start": path[0],
+  +                "end": path[-1],
+                   "path": path,
+                   "elements": path_elements,
+                   "element_map": element_map,
+  +53 -29
+
+src/osdagbridge/core/bridge_types/plate_girder/dto.py
+  @@ -105,7 +105,7 @@ class SteelProperties:
+  -        Density (kN/m^3).
+  +        Mass/unit-weight density value passed to the solver (N/m^3).
+       Fy : float, optional
+           Yield strength (Pa). Required for steel.
+       E0 : float, optional
+  +1 -1
+
+src/osdagbridge/core/bridge_types/plate_girder/plategirderbridge.py
+  @@ -2,6 +2,7 @@ from __future__ import annotations
+  +from math import isfinite
+   from .ui_fields import FrontendData
+   from .dto import (
+       ConcreteProperties,
+  @@ -1316,11 +1317,36 @@ class PlateGirderBridge:
+  -        rho = self._lookup_material(steel_grade, "Density")
+  -        if rho is None:
+  -            raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
+  -            rho = (float(raw_rho) * 1000.0
+  -                   if raw_rho not in (None, "") else _DEFAULT_DENSITY)
+  +        # The material dialog's density is an explicit override for every grade,
+  +        # including database grades. It is expressed in kN/m³; SteelProperties
+  +        # and the grillage material API use N/m³.
+  +        raw_rho = self.input_dict.get(KEY_MATERIAL_GIRDER_DENSITY)
+  +        if raw_rho not in (None, ""):
+  +            try:
+  +                rho_kN_m3 = float(raw_rho)
+  +            except (TypeError, ValueError, OverflowError) as exc:
+  +                raise ValueError(
+  +                    f"Girder steel density must be a finite value between "
+  +                    f"50 and 120 kN/m³; received {raw_rho!r}."
+  +                ) from exc
+  +            if not isfinite(rho_kN_m3) or not 50.0 <= rho_kN_m3 <= 120.0:
+  +                raise ValueError(
+  +                    f"Girder steel density must be a finite value between "
+  +                    f"50 and 120 kN/m³; received {raw_rho!r}."
+  +                )
+  +            rho = rho_kN_m3 * 1000.0
+  +        else:
+  +            # Keep each database grade's value when no explicit UI/OSI value
+  +            # was supplied; custom materials retain the established default.
+  +            rho = self._lookup_material(steel_grade, "Density")
+  +            if rho is None:
+  +                rho = _DEFAULT_DENSITY
+  +            if not isfinite(float(rho)) or float(rho) <= 0.0:
+  +                raise ValueError(
+  +                    f"Database steel density for {steel_grade!r} must be "
+  +                    f"finite and positive; received {rho!r}."
+  +                )
+  +            rho = float(rho)
+   
+           fy = self._lookup_material(steel_grade, "Yield Strength")
+           if fy is None:
+  @@ -1465,10 +1491,7 @@ class PlateGirderBridge:
+  -        try:
+  -            model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
+  -        except TypeError:
+  -            model.create_self_weight_load()
+  +        model.create_self_weight_load(steel_density_kN_m3=steel_density_kn_m3)
+           deck_density = self.input_dict.get(KEY_MATERIAL_DECK_DENSITY)
+           if deck_density in (None, ""):
+               deck_density = 25.0
+  +32 -9
+
+tests/integration/run_phase21_engineering_matrix.py
+  @@ -0,0 +1,187 @@
+  +"""Run real OpenSees designs for the Phase 21 density/girder review.
+  +
+  +Execute from the repository root with the Osdag Python 3.12 environment and
+  +``PYTHONPATH=src``. The script uses the production bridge backend and solver;
+  +it writes only into the supplied Phase 21 evidence directory.
+  +"""
+  +from __future__ import annotations
+  +
+  +import json
+  +import sys
+  +import traceback
+  +import warnings
+  +from copy import deepcopy
+  +from pathlib import Path
+  +
+  +from osdagbridge.core.bridge_types.plate_girder.defaults import (
+  +    BASIC_INPUT_DICT,
+  +    solve_extend_basic_input_dict,
+  +)
+  +from osdagbridge.core.bridge_types.plate_girder.plategirderbridge import PlateGirderBridge
+  +from osdagbridge.core.utils.common import (
+  +    KEY_CARRIAGEWAY_WIDTH,
+  +    KEY_GIRDER,
+  +    KEY_MATERIAL_DECK_DENSITY,
+  +    KEY_MATERIAL_DECK_ECM,
+  +    KEY_MATERIAL_DECK_FCK,
+  +    KEY_MATERIAL_DECK_FCTM,
+  +    KEY_MATERIAL_GIRDER_DENSITY,
+  +    KEY_MATERIAL_GIRDER_E,
+  +    KEY_MATERIAL_GIRDER_FU,
+  +    KEY_MATERIAL_GIRDER_FY,
+  +    KEY_MATERIAL_GIRDER_G,
+  +    KEY_MATERIAL_GIRDER_POISSON,
+  +    KEY_PROJECT_LOCATION,
+  +    KEY_SKEW_ANGLE,
+  +    KEY_SPAN,
+  +    KEY_TS_DECK_OVERHANG,
+  +    KEY_TS_GIRDER_SPACING,
+  +    KEY_TS_NO_OF_GIRDERS,
+  +    KEY_TS_OVERALL_WIDTH,
+  +)
+  +
+  +
+  +LOCATION = {
+  +    "state": "Delhi",
+  +    "district": "New Delhi",
+  +    "weather_data": {
+  +        "zone": "IV",
+  +        "z_value": 0.24,
+  +        "wind_speed": 47.0,
+  +        "max_temp": 65.0,
+  +        "min_temp": -10.0,
+  +    },
+  +}
+  +
+  +CASES = (
+  +    {"name": "default_3g_0deg_overhang", "girders": 3, "skew": 0.0, "density": 78.5},
+  +    {"name": "custom_3g_0deg_overhang_85", "girders": 3, "skew": 0.0, "density": 85.0, "custom": True},
+  +    {"name": "default_4g_0deg_overhang", "girders": 4, "skew": 0.0, "density": 78.5},
+  +    {"name": "default_3g_plus5deg_overhang", "girders": 3, "skew": 5.0, "density": 78.5},
+  +    {"name": "default_4g_minus5deg_overhang", "girders": 4, "skew": -5.0, "density": 78.5},
+  +    {"name": "default_3g_0deg_zero_overhang", "girders": 3, "skew": 0.0, "density": 78.5, "zero_overhang": True},
+  +)
+  +
+  +
+  +def build_inputs(case: dict) -> dict:
+  +    data = deepcopy(BASIC_INPUT_DICT)
+  +    data.update({
+  +        KEY_SPAN: 25.0,
+  +        KEY_CARRIAGEWAY_WIDTH: 7.5,
+  +        KEY_PROJECT_LOCATION: deepcopy(LOCATION),
+  +        KEY_SKEW_ANGLE: float(case["skew"]),
+  +        KEY_TS_NO_OF_GIRDERS: int(case["girders"]),
+  +        KEY_MATERIAL_GIRDER_DENSITY: float(case["density"]),
+  +        KEY_MATERIAL_GIRDER_G: 76.923,
+  +        KEY_MATERIAL_DECK_DENSITY: 25.0,
+  +        KEY_MATERIAL_DECK_FCK: 40.0,
+  +        KEY_MATERIAL_DECK_FCTM: 3.5,
+  +        KEY_MATERIAL_DECK_ECM: 34.0,
+  +    })
+  +    if case.get("custom"):
+  +        data.update({
+  +            KEY_GIRDER: "custom_steel_355_500",
+  +            KEY_MATERIAL_GIRDER_E: 210.0,
+  +            KEY_MATERIAL_GIRDER_G: 80.769,
+  +            KEY_MATERIAL_GIRDER_FY: 355.0,
+  +            KEY_MATERIAL_GIRDER_FU: 500.0,
+  +            KEY_MATERIAL_GIRDER_POISSON: 0.3,
+  +        })
+  +    solve_extend_basic_input_dict(data)
+  +    if case.get("zero_overhang"):
+  +        data[KEY_TS_DECK_OVERHANG] = 0.0
+  +        data[KEY_TS_GIRDER_SPACING] = float(data[KEY_TS_OVERALL_WIDTH]) / (int(case["girders"]) - 1)
+  +    return data
+  +
+  +
+  +def run_case(case: dict) -> dict:
+  +    bridge = PlateGirderBridge()
+  +    inputs = build_inputs(case)
+  +    bridge.set_input(inputs)
+  ... (87 lines truncated)
+  +187 -0
+
+tests/integration/run_phase21_report.py
+  @@ -0,0 +1,91 @@
+  +"""Generate a real backend report through the app pipeline using Tectonic."""
+  +from __future__ import annotations
+  +
+  +import json
+  +import importlib.util
+  +import os
+  +from pathlib import Path
+  +import shutil
+  +import subprocess
+  +import sys
+  +
+  +from osdagbridge.core.bridge_types.plate_girder.plategirderbridge import PlateGirderBridge
+  +from osdagbridge.core.reports.report_generator import (
+  +    ReportMetadata,
+  +    ReportOptions,
+  +    ReportRequest,
+  +)
+  +
+  +
+  +TECTONIC = os.environ.get("TECTONIC") or shutil.which("tectonic") or (
+  +    "/Users/rohansiddhpura/.cache/codex-runtimes/codex-primary-runtime/"
+  +    "dependencies/bin/override/tectonic"
+  +)
+  +ORIGINAL_RUN = subprocess.run
+  +MATRIX_SPEC = importlib.util.spec_from_file_location(
+  +    "phase21_engineering_matrix", Path(__file__).with_name("run_phase21_engineering_matrix.py")
+  +)
+  +MATRIX = importlib.util.module_from_spec(MATRIX_SPEC)
+  +MATRIX_SPEC.loader.exec_module(MATRIX)
+  +
+  +
+  +def tectonic_compat(command, **kwargs):
+  +    """Translate the report generator's pdflatex invocation to real Tectonic."""
+  +    if isinstance(command, (list, tuple)) and len(command) == 3 and command[1] == "-interaction=nonstopmode":
+  +        tex_file = command[2]
+  +        tectonic_command = [TECTONIC, "--color", "never", "-o", kwargs["cwd"], tex_file]
+  +        return ORIGINAL_RUN(tectonic_command, **kwargs)
+  +    return ORIGINAL_RUN(command, **kwargs)
+  +
+  +
+  +def main() -> int:
+  +    outdir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("evidence/generated-phase21-report")
+  +    outdir.mkdir(parents=True, exist_ok=True)
+  +    case = next(item for item in MATRIX.CASES if item["name"] == "custom_3g_0deg_overhang_85")
+  +    bridge = PlateGirderBridge()
+  +    bridge.set_input(MATRIX.build_inputs(case))
+  +    bridge.design()
+  +
+  +    request = ReportRequest(
+  +        metadata=ReportMetadata(
+  +            project_name="Phase 21 density regression",
+  +            project_location="Local solver verification",
+  +            designer="FOSSEE OsdagBridge QA",
+  +            client="Regression fixture",
+  +            company="FOSSEE IIT Bombay",
+  +            report_date="2026-11-23",
+  +        ),
+  +        options=ReportOptions(
+  +            sections=["loads", "analysis", "design_checks"],
+  +            include_figures=False,
+  +            include_toc=True,
+  +            include_pdf=True,
+  +        ),
+  +        output_dir=str(outdir),
+  +        file_stem="phase21-density-85",
+  +    )
+  +    subprocess.run = tectonic_compat
+  +    try:
+  +        report_result = bridge.generate_design_report(request, None)
+  +    finally:
+  +        subprocess.run = ORIGINAL_RUN
+  +
+  +    result = {
+  +        "pdf_path": report_result.pdf_path,
+  +        "tex_path": report_result.tex_path,
+  +        "pdf_exists": bool(report_result.pdf_path and Path(report_result.pdf_path).is_file()),
+  +        "tex_exists": bool(report_result.tex_path and Path(report_result.tex_path).is_file()),
+  +        "compiler": TECTONIC,
+  +        "backend_density_N_m3": float(bridge.material_props.steel_prop.rho),
+  +        "backend_design_girders": int(bridge.design_results.get("n_girders", -1)),
+  +        "report_per_girder_keys": list(bridge.design_results.get("per_girder", {})),
+  +        "status": "completed" if report_result.pdf_path and Path(report_result.pdf_path).is_file() else "failed",
+  +    }
+  +    Path(outdir, "phase21-report-result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+  +    print(json.dumps(result, indent=2))
+  +    bridge.memory.release()
+  +    return 0 if result["status"] == "completed" else 1
+  +
+  +
+  +if __name__ == "__main__":
+  +    raise SystemExit(main())
+  +91 -0
+
+tests/unit/test_phase89_candidate_regressions.py
+  @@ -119,6 +119,69 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+  +    def test_explicit_steel_density_overrides_database_grade_and_converts_units(self):
+  +        bridge = object.__new__(bridge_module.PlateGirderBridge)
+  +        bridge.input_dict = {
+  +            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
+  +            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+  +            KEY_MATERIAL_GIRDER_DENSITY: 85.0,
+  +            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
+  +            KEY_MATERIAL_GIRDER_POISSON: 0.3,
+  +            KEY_MATERIAL_GIRDER_FY: 355, KEY_MATERIAL_GIRDER_FU: 505,
+  +            KEY_MATERIAL_DECK_FCK: 40, KEY_MATERIAL_DECK_FCTM: 3,
+  +            KEY_MATERIAL_DECK_ECM: 33,
+  +        }
+  +        bridge._lookup_material = lambda grade, prop: (
+  +            78500.0 if prop == "Density" else
+  +            210e9 if prop == "Modulus of Elasticity" else
+  +            0.3 if prop == "Poisson's Ratio" else
+  +            355e6 if prop == "Yield Strength" else
+  +            505e6 if prop == "Ultimate Tensile Strength" else
+  +            40 if prop == "fck" else
+  +            3 if prop == "fctm" else
+  +            33 if prop == "Ecm" else None
+  +        )
+  +        self.assertEqual(bridge._build_material_props().steel_prop.rho, 85000.0)
+  +
+  +    def test_steel_density_defaults_to_database_or_legacy_custom_default(self):
+  +        bridge = object.__new__(bridge_module.PlateGirderBridge)
+  +        bridge.input_dict = {
+  +            KEY_GIRDER: "E 350A", KEY_CROSS_BRACING: "E 350A",
+  +            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+  +        }
+  +        bridge._lookup_material = lambda _grade, prop: (
+  +            78500.0 if prop == "Density" else
+  +            210e9 if prop == "Modulus of Elasticity" else
+  +            0.3 if prop == "Poisson's Ratio" else
+  +            355e6 if prop == "Yield Strength" else
+  +            505e6 if prop == "Ultimate Tensile Strength" else
+  +            40 if prop == "fck" else
+  +            3 if prop == "fctm" else
+  +            33 if prop == "Ecm" else None
+  +        )
+  +        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
+  +
+  +        bridge.input_dict[KEY_GIRDER] = "custom_steel_case"
+  +        bridge._lookup_material = lambda *_: None
+  +        self.assertEqual(bridge._build_material_props().steel_prop.rho, 78500.0)
+  +
+  +    def test_invalid_explicit_steel_density_is_rejected(self):
+  +        bridge = object.__new__(bridge_module.PlateGirderBridge)
+  +        bridge.input_dict = {
+  +            KEY_GIRDER: "custom_steel_case", KEY_CROSS_BRACING: "E 350A",
+  +            KEY_END_DIAPHRAGM: "E 350A", KEY_DECK_CONCRETE_GRADE_BASIC: "M40",
+  +            KEY_MATERIAL_GIRDER_E: 210, KEY_MATERIAL_GIRDER_G: 81,
+  +            KEY_MATERIAL_GIRDER_POISSON: 0.3, KEY_MATERIAL_GIRDER_FY: 355,
+  +            KEY_MATERIAL_GIRDER_FU: 505, KEY_MATERIAL_DECK_FCK: 40,
+  +            KEY_MATERIAL_DECK_FCTM: 3, KEY_MATERIAL_DECK_ECM: 33,
+  +        }
+  +        bridge._lookup_material = lambda *_: None
+  +        for bad_density in ("NaN", "Infinity", "not-a-number", 49.9, 120.1):
+  +            with self.subTest(density=bad_density):
+  +                bridge.input_dict[KEY_MATERIAL_GIRDER_DENSITY] = bad_density
+  +                with self.assertRaisesRegex(ValueError, "density must be a finite value"):
+  +                    bridge._build_material_props()
+  +
+       def test_custom_steel_density_scales_self_weight_load_model(self):
+           added = []
+           gm = analyser_module.BridgeGrillageModel.__new__(analyser_module.BridgeGrillageModel)
+  @@ -130,7 +193,7 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+  -        gm.create_self_weight_load(steel_density_kN_m3=80.0)
+  +        gm.create_self_weight_load(steel_density_kN_m3=85.0)
+           load_obj = added[0].load_command[0] if hasattr(added[0], "load_command") else added[0].loads_list[0] if hasattr(added[0], "loads_list") else None
+           # Fallback inspection across ospgrillage LoadCase internals or create_load vertices
+           with patch.object(analyser_module.og, "create_load_vertex", side_effect=lambda **kw: kw) as mock_vtx, patch.object(
+  @@ -138,12 +201,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+  -            gm.create_self_weight_load(steel_density_kN_m3=80.0)
+  +            gm.create_self_weight_load(steel_density_kN_m3=85.0)
+               p_custom = mock_vtx.call_args_list[0].kwargs["p"]
+               mock_vtx.reset_mock()
+               gm.create_self_weight_load(steel_density_kN_m3=78.5)
+               p_std = mock_vtx.call_args_list[0].kwargs["p"]
+  -        self.assertAlmostEqual(p_custom / p_std, 80.0 / 78.5, places=6)
+  +        self.assertAlmostEqual(p_custom / p_std, 85.0 / 78.5, places=6)
+   
+       def test_custom_deck_density_is_passed_to_load_model(self):
+           bridge = object.__new__(bridge_module.PlateGirderBridge)
+  @@ -400,14 +463,14 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+  -            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0]),
+  -            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0]),
+  -            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0]),
+  -            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0]),
+  +            (3, 1.5, ["EB1", "G1", "G2", "G3", "EB2"], [11.0, 28.0, 24.0, 29.0, 12.0], 5.0),
+  +            (4, 1.5, ["EB1", "G1", "G2", "G3", "G4", "EB2"], [10.0, 27.0, 22.0, 23.0, 31.0, 11.0], -5.0),
+  +            (3, 0.0, ["G1", "G2", "G3"], [28.0, 24.0, 29.0], 5.0),
+  +            (4, 0.0, ["G1", "G2", "G3", "G4"], [27.0, 22.0, 23.0, 31.0], -5.0),
+           ]
+   
+  -        for n_main, edge_dist, expected_keys, line_shears_kn in configs:
+  -            with self.subTest(n_main=n_main, edge_dist=edge_dist):
+  +        for n_main, edge_dist, expected_keys, line_shears_kn, skew_deg in configs:
+  +            with self.subTest(n_main=n_main, edge_dist=edge_dist, skew_deg=skew_deg):
+                   n_lines = len(expected_keys)
+                   nodes = {}
+                   elements = {}
+  @@ -417,11 +480,12 @@ class Phase89CandidateRegressionTests(unittest.TestCase):
+  +                    x_shift = z * np.tan(np.deg2rad(skew_deg))
+                       n_start, n_mid, n_end = nid, nid + 1, nid + 2
+                       nid += 3
+  -                    nodes[n_start] = (0.0, 0.0, z)
+  -                    nodes[n_mid] = (15.0, 0.0, z)
+  -                    nodes[n_end] = (30.0, 0.0, z)
+  +                    nodes[n_start] = (x_shift, 0.0, z)
+  +                    nodes[n_mid] = (15.0 + x_shift, 0.0, z)
+  +                    nodes[n_end] = (30.0 + x_shift, 0.0, z)
+                       e1, e2 = eid, eid + 1
+                       eid += 2
+                       elements[e1] = (n_start, n_mid)
+  +76 -12
+[full diff: rtk git diff --no-compact]

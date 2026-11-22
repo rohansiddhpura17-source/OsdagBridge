@@ -1,0 +1,15 @@
+{
+  "pdf_path": "evidence/generated-phase21-report/phase21-density-85.pdf",
+  "tex_path": "evidence/generated-phase21-report/phase21-density-85.tex",
+  "pdf_exists": true,
+  "tex_exists": true,
+  "compiler": "/Users/rohansiddhpura/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/tectonic",
+  "backend_density_N_m3": 85000.0,
+  "backend_design_girders": 3,
+  "report_per_girder_keys": [
+    "G1",
+    "G2",
+    "G3"
+  ],
+  "status": "completed"
+}
